@@ -893,7 +893,12 @@ function patchSessionFileLifecycleBlocks(blocks, engine, sessionPath) {
 
 function listSessionRegistryFiles(engine, sessionPath) {
   if (!sessionPath || typeof engine?.listSessionFiles !== "function") return [];
-  return engine.listSessionFiles(sessionPath).map(file => serializeSessionFile(file)).filter(Boolean);
+  return engine.listSessionFiles(sessionPath)
+    .map(file => {
+      if (typeof engine.serializeSessionFile === "function") return engine.serializeSessionFile(file);
+      return serializeSessionFile(file, { runtimeContext: engine?.runtimeContext || null });
+    })
+    .filter(Boolean);
 }
 
 function sessionFileLifecycleFields(file) {

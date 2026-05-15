@@ -1,0 +1,115 @@
+import fs from "fs";
+import { Readable } from "stream";
+import { Hono } from "hono";
+import { ResourceError } from "../../core/resource-service.js";
+
+export function createResourcesRoute(engine) {
+  const route = new Hono();
+
+  route.get("/resources/:resourceId", (c) => {
+    try {
+      const resource = getResource(engine, c.req.param("resourceId"));
+      if (!resource) return c.json({ error: "resource_not_found" }, 404);
+      return c.json(resource);
+    } catch (err) {
+      return resourceRouteError(c, err);
+    }
+  });
+
+  route.get("/resources/:resourceId/content", (c) => serveResourceContent(c, engine, false));
+  route.on("HEAD", "/resources/:resourceId/content", (c) => serveResourceContent(c, engine, true));
+
+  return route;
+}
+
+function getResource(engine, resourceId) {
+  if (typeof engine?.getResource === "function") return engine.getResource(resourceId);
+  return engine?.resources?.getResource?.(resourceId) || null;
+}
+
+function resolveResourceContent(engine, resourceId) {
+  if (typeof engine?.resolveResourceContent === "function") {
+    return engine.resolveResourceContent(resourceId);
+  }
+  if (typeof engine?.resources?.resolveContent === "function") {
+    return engine.resources.resolveContent(resourceId);
+  }
+  throw new ResourceError("resource service unavailable", {
+    status: 500,
+    code: "resource_service_unavailable",
+  });
+}
+
+function serveResourceContent(c, engine, headOnly) {
+  try {
+    const content = resolveResourceContent(engine, c.req.param("resourceId"));
+    if (c.req.header("if-none-match") && c.req.header("if-none-match") === content.etag) {
+      c.header("ETag", content.etag);
+      return c.body(null, 304);
+    }
+
+    const range = parseRangeHeader(c.req.header("range"), content.size);
+    if (range?.unsatisfiable) {
+      c.header("Content-Range", `bytes */${content.size}`);
+      c.header("Accept-Ranges", "bytes");
+      return c.body(null, 416);
+    }
+
+    const start = range ? range.start : 0;
+    const end = range ? range.end : content.size - 1;
+    const length = content.size === 0 ? 0 : end - start + 1;
+    const status = range ? 206 : 200;
+
+    c.header("Content-Type", content.mime || "application/octet-stream");
+    c.header("Accept-Ranges", "bytes");
+    c.header("Content-Length", String(length));
+    c.header("Cache-Control", "private, max-age=0, must-revalidate");
+    if (content.etag) c.header("ETag", content.etag);
+    if (range) c.header("Content-Range", `bytes ${start}-${end}/${content.size}`);
+    if (content.filename) c.header("Content-Disposition", contentDisposition(content.filename));
+    if (headOnly || content.size === 0) return c.body(null, status);
+
+    const stream = fs.createReadStream(content.filePath, { start, end });
+    return c.body(Readable.toWeb(stream), status);
+  } catch (err) {
+    return resourceRouteError(c, err);
+  }
+}
+
+function parseRangeHeader(value, size) {
+  if (!value) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+  if (!match) return { unsatisfiable: true };
+
+  let start;
+  let end;
+  if (match[1] === "" && match[2] === "") return { unsatisfiable: true };
+  if (match[1] === "") {
+    const suffixLength = Number(match[2]);
+    if (!Number.isSafeInteger(suffixLength) || suffixLength <= 0) return { unsatisfiable: true };
+    start = Math.max(size - suffixLength, 0);
+    end = Math.max(size - 1, 0);
+  } else {
+    start = Number(match[1]);
+    end = match[2] === "" ? size - 1 : Number(match[2]);
+  }
+
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) return { unsatisfiable: true };
+  if (size <= 0 || start >= size || start > end) return { unsatisfiable: true };
+  return { start, end: Math.min(end, size - 1) };
+}
+
+function contentDisposition(filename) {
+  const fallback = filename.replace(/["\\\r\n]/g, "_");
+  return `inline; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
+function resourceRouteError(c, err) {
+  if (err instanceof ResourceError) {
+    return c.json({ error: err.code, detail: err.message }, err.status);
+  }
+  return c.json({
+    error: "resource_error",
+    detail: err?.message || String(err),
+  }, 500);
+}

@@ -29,6 +29,43 @@ export interface HanaSessionFile {
   storageKind?: string;
   status?: string;
   missingAt?: number | string | null;
+  resource?: HanaResourceEnvelope;
+  [key: string]: unknown;
+}
+
+export interface HanaResourceEnvelope {
+  schemaVersion: 1;
+  resourceId: string;
+  name: string;
+  spaceId: string;
+  type: 'file' | string;
+  source: 'session_file' | string;
+  sourceId?: string;
+  fileId?: string;
+  displayName?: string;
+  filename?: string;
+  ext?: string | null;
+  mime?: string;
+  size?: number | null;
+  kind?: string;
+  isDirectory?: boolean;
+  origin?: string;
+  operations?: string[];
+  createdAt?: number | string;
+  mtimeMs?: number;
+  lifecycle: {
+    status: string;
+    missingAt: number | string | null;
+  };
+  storage: {
+    provider: string;
+    storageKind?: string;
+    localOnly?: boolean;
+  };
+  links: {
+    self: string;
+    content?: string;
+  };
   [key: string]: unknown;
 }
 

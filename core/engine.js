@@ -20,6 +20,7 @@ import { migrateToProvidersYaml } from "./migrate-providers.js";
 import { migrateProviderMediaConfig } from "./provider-media-config.js";
 import { runMigrations } from "./migrations.js";
 import { createServerRuntimeContext } from "./server-runtime-context.js";
+import { ResourceService } from "./resource-service.js";
 import { findModel } from "../shared/model-ref.js";
 import { resolveWorkspaceSkillPaths } from "../shared/workspace-skill-paths.js";
 import { resolveHanaPiAgentDir, resolveHanaPiProjectDir } from "../shared/hana-runtime-paths.js";
@@ -122,6 +123,7 @@ import {
   isComputerUsePlatformSupported,
 } from "./computer-use/platform-support.js";
 import { SessionFileRegistry } from "../lib/session-files/session-file-registry.js";
+import { serializeSessionFile } from "../lib/session-files/session-file-response.js";
 import { NotificationService } from "../lib/notifications/notification-service.js";
 import {
   getSkillNameTranslationCachePath,
@@ -141,6 +143,7 @@ export class HanaEngine {
     this.productDir = productDir;
     this.appVersion = appVersion || "0.0.0";
     this._runtimeContext = null;
+    this._resources = null;
     this.agentsDir = path.join(hanakoHome, "agents");
     this.userDir = path.join(hanakoHome, "user");
     this.channelsDir = path.join(hanakoHome, "channels");
@@ -391,6 +394,14 @@ export class HanaEngine {
   getSessionFile(fileId, options) { return this._sessionFiles.get(fileId, options); }
   getSessionFileByPath(filePath, options) { return this._sessionFiles.getByFilePath(filePath, options); }
   listSessionFiles(sessionPath) { return this._sessionFiles.list(sessionPath); }
+  get resources() { return this._resources; }
+  getResourceService() {
+    if (!this._resources) throw new Error("resource service is not initialized");
+    return this._resources;
+  }
+  getResource(resourceId) { return this.getResourceService().getResource(resourceId); }
+  resolveResourceContent(resourceId) { return this.getResourceService().resolveContent(resourceId); }
+  serializeSessionFile(file) { return serializeSessionFile(file, { runtimeContext: this.getRuntimeContext() }); }
   async cleanupColdSessionFiles(options) {
     return this._sessionFiles.cleanupColdSessions({
       agentsDir: this.agentsDir,
@@ -962,6 +973,11 @@ export class HanaEngine {
     this._runtimeContext = createServerRuntimeContext({
       hanakoHome: this.hanakoHome,
       appVersion: this.appVersion,
+    });
+    this._resources = new ResourceService({
+      agentsDir: this.agentsDir,
+      sessionFiles: this._sessionFiles,
+      runtimeContext: this._runtimeContext,
     });
 
     // 频道初始化和 agent 构造会调用 server-side i18n。locale 是 global
