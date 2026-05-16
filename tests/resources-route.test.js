@@ -279,4 +279,62 @@ describe("resources route", () => {
     expect(res.headers.get("content-range")).toBe("bytes 6-14/16");
     expect(await res.text()).toBe("resources");
   });
+
+  it("issues a short-lived content ticket and serves content without auth context when ticket is valid", async () => {
+    const { createResourcesRoute } = await import("../server/routes/resources.js");
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-resources-ticket-"));
+    const filePath = path.join(tmpDir, "asset.txt");
+    fs.writeFileSync(filePath, "ticket content", "utf-8");
+    const app = new Hono();
+    app.use("/api/resources/*", async (c, next) => {
+      if (c.req.path.endsWith("/ticket")) {
+        c.set("authPrincipal", Object.freeze({
+          kind: "device",
+          credentialKind: "device_credential",
+          connectionKind: "lan",
+          trustState: "paired",
+          userId: "user_1",
+          studioId: "studio_1",
+          serverNodeId: "node_1",
+          deviceId: "device_1",
+          scopes: ["resources.content"],
+        }));
+      }
+      await next();
+    });
+    app.route("/api", createResourcesRoute({
+      hanakoHome: tmpDir,
+      getRuntimeContext: () => ({
+        serverId: "server_1",
+        serverNodeId: "node_1",
+        userId: "user_1",
+        studioId: "studio_1",
+      }),
+      resolveResourceContent: () => ({
+        resourceId: "res_ticket",
+        resource: { resourceId: "res_ticket", studioId: "studio_1" },
+        filePath,
+        mime: "text/plain",
+        size: Buffer.byteLength("ticket content"),
+        filename: "asset.txt",
+      }),
+    }));
+
+    const ticketRes = await app.request("/api/resources/res_ticket/ticket", { method: "POST" });
+    expect(ticketRes.status).toBe(200);
+    const ticketBody = await ticketRes.json();
+    expect(ticketBody).toMatchObject({
+      resourceId: "res_ticket",
+      contentUrl: expect.stringContaining("/api/resources/res_ticket/content?ticket="),
+      expiresAt: expect.any(String),
+    });
+
+    const contentRes = await app.request(ticketBody.contentUrl);
+    expect(contentRes.status).toBe(200);
+    expect(await contentRes.text()).toBe("ticket content");
+
+    const wrongRes = await app.request(`/api/resources/res_other/content?ticket=${encodeURIComponent(ticketBody.ticket)}`);
+    expect(wrongRes.status).toBe(403);
+    expect(await wrongRes.json()).toMatchObject({ error: "resource_ticket_invalid" });
+  });
 });

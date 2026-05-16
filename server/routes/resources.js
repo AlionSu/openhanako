@@ -2,6 +2,11 @@ import fs from "fs";
 import { Readable } from "stream";
 import { Hono } from "hono";
 import { ResourceError } from "../../core/resource-service.js";
+import {
+  issueResourceTicket,
+  verifyResourceTicket,
+  ResourceTicketError,
+} from "../../core/resource-ticket-service.js";
 import { createRequestContext, jsonError } from "../http/boundary.js";
 
 export function createResourcesRoute(engine) {
@@ -13,6 +18,30 @@ export function createResourcesRoute(engine) {
       const resource = getResource(engine, c.req.param("resourceId"), requestContext);
       if (!resource) return jsonError(c, { code: "resource_not_found", status: 404 });
       return c.json(resource);
+    } catch (err) {
+      return resourceRouteError(c, err);
+    }
+  });
+
+  route.post("/resources/:resourceId/ticket", (c) => {
+    try {
+      const resourceId = c.req.param("resourceId");
+      const requestContext = createRequestContext(c, engine);
+      const content = resolveResourceContent(engine, resourceId, requestContext);
+      const studioId = content.resource?.studioId || requestContext.studioId;
+      const issued = issueResourceTicket({
+        hanakoHome: engine?.hanakoHome,
+        resourceId,
+        studioId,
+        principalId: requestContext.principalId,
+      });
+      return c.json({
+        ticket: issued.ticket,
+        ticketId: issued.ticketId,
+        resourceId,
+        expiresAt: issued.expiresAt,
+        contentUrl: `/api/resources/${encodeURIComponent(resourceId)}/content?ticket=${encodeURIComponent(issued.ticket)}`,
+      });
     } catch (err) {
       return resourceRouteError(c, err);
     }
@@ -48,6 +77,24 @@ function resolveResourceContent(engine, resourceId, requestContext) {
   });
 }
 
+function resolveTrustedResourceContent(engine, resourceId) {
+  const options = { requestContext: { authPrincipal: { kind: "resource_ticket" } } };
+  if (typeof engine?.resolveResourceContent === "function") {
+    return engine.resolveResourceContent(resourceId, options);
+  }
+  if (typeof engine?.resources?.resolveContent === "function") {
+    return engine.resources.resolveContent(resourceId, options);
+  }
+  const access = getResourceAccess(engine);
+  if (typeof access?.resolveTrustedContent === "function") {
+    return access.resolveTrustedContent(resourceId, options.requestContext);
+  }
+  throw new ResourceError("resource service unavailable", {
+    status: 500,
+    code: "resource_service_unavailable",
+  });
+}
+
 function getResourceAccess(engine) {
   if (typeof engine?.getResourceAccessService === "function") return engine.getResourceAccessService();
   return engine?.resourceAccess || null;
@@ -55,8 +102,11 @@ function getResourceAccess(engine) {
 
 function serveResourceContent(c, engine, headOnly) {
   try {
-    const requestContext = createRequestContext(c, engine);
-    const content = resolveResourceContent(engine, c.req.param("resourceId"), requestContext);
+    const resourceId = c.req.param("resourceId");
+    const ticket = c.req.query("ticket");
+    const content = ticket
+      ? resolveTicketContent(c, engine, resourceId, ticket)
+      : resolveResourceContent(engine, resourceId, createRequestContext(c, engine));
     if (c.req.header("if-none-match") && c.req.header("if-none-match") === content.etag) {
       c.header("ETag", content.etag);
       return c.body(null, 304);
@@ -88,6 +138,15 @@ function serveResourceContent(c, engine, headOnly) {
   } catch (err) {
     return resourceRouteError(c, err);
   }
+}
+
+function resolveTicketContent(c, engine, resourceId, ticket) {
+  verifyResourceTicket({
+    hanakoHome: engine?.hanakoHome,
+    ticket,
+    resourceId,
+  });
+  return resolveTrustedResourceContent(engine, resourceId);
 }
 
 function parseRangeHeader(value, size) {
@@ -137,6 +196,9 @@ function asciiFilenameFallback(filename) {
 }
 
 function resourceRouteError(c, err) {
+  if (err instanceof ResourceTicketError) {
+    return jsonError(c, { code: err.code, detail: err.message, status: err.status });
+  }
   if (err instanceof ResourceError) {
     return jsonError(c, { code: err.code, detail: err.message, status: err.status });
   }

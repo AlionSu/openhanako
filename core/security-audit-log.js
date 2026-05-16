@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { capabilityDecisionSummary } from "./capability-policy.js";
 import { principalSummary } from "./security-principal.js";
+import { MASKED_SECRET } from "../shared/secret-custody.js";
 
 export const SECURITY_AUDIT_LOG_FILE = "security-audit.jsonl";
 
@@ -65,7 +66,8 @@ function sanitizeObject(value) {
   const out = {};
   for (const [key, entry] of Object.entries(value)) {
     if (entry === undefined) continue;
-    out[sanitizeString(key)] = sanitizeValue(entry);
+    const safeKey = sanitizeString(key);
+    out[safeKey] = isSecretLikeKey(key) ? maskAuditSecret(entry) : sanitizeValue(entry);
   }
   return out;
 }
@@ -78,4 +80,24 @@ function sanitizeValue(value) {
 
 function sanitizeString(value) {
   return String(value).replace(/[\r\n\t]/g, " ").slice(0, 500);
+}
+
+function isSecretLikeKey(key) {
+  const normalized = String(key || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return normalized === "apikey"
+    || normalized === "apitoken"
+    || normalized === "bottoken"
+    || normalized === "appsecret"
+    || normalized === "secret"
+    || normalized === "password"
+    || normalized === "accesstoken"
+    || normalized === "refreshtoken"
+    || normalized.endsWith("secret")
+    || normalized.endsWith("token")
+    || normalized.endsWith("password");
+}
+
+function maskAuditSecret(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  return MASKED_SECRET;
 }

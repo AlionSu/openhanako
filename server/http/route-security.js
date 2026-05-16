@@ -71,6 +71,9 @@ export function classifyHttpRoute({ method = "GET", path = "" } = {}) {
   if (isSettingsWriteRoute(verb, routePath)) return scoped("settings.write");
   if (isProviderManagementRoute(verb, routePath)) return scoped("providers.manage");
   if (isBridgeManagementRoute(verb, routePath)) return scoped("bridge.manage");
+  if (verb === "POST" && /^\/api\/resources\/[^/]+\/ticket$/.test(routePath)) {
+    return scoped("resources.read");
+  }
   if (routePath.startsWith("/api/resources/")) {
     if (verb === "GET" || verb === "HEAD") return scoped("resources.read");
     return scoped("resources.write");

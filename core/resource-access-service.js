@@ -47,6 +47,14 @@ export class ResourceAccessService {
     };
   }
 
+  resolveTrustedContent(resourceId, requestContext = null) {
+    const content = this._resolveContent(resourceId, requestContext);
+    return {
+      ...content,
+      resource: content.resource ? this._sanitizeResource(content.resource, requestContext) : content.resource,
+    };
+  }
+
   sanitizeSessionFile(file, requestContext) {
     if (isLocalOwner(requestContext)) return file;
     return removePathFields(file);

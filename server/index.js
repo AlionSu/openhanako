@@ -204,6 +204,11 @@ app.use("*", async (c, next) => {
   const routePath = new URL(c.req.url).pathname;
   c.set("transportConnectionKind", transport.connectionKind);
 
+  if (isResourceTicketContentRequest(c, routePath)) {
+    await next();
+    return;
+  }
+
   if (isPublicHttpRoute({ method: c.req.method, path: routePath })) {
     await next();
     return;
@@ -229,6 +234,13 @@ app.use("*", async (c, next) => {
 
   await next();
 });
+
+function isResourceTicketContentRequest(c, routePath) {
+  const method = c.req.method;
+  return (method === "GET" || method === "HEAD")
+    && /^\/api\/resources\/[^/]+\/content$/.test(routePath)
+    && !!c.req.query("ticket");
+}
 
 // 全局错误处理
 app.onError((err, c) => {

@@ -102,6 +102,8 @@ describe("HTTP route security policy", () => {
       .toMatchObject({ allowed: true });
     expect(authorizeHttpRoute({ method: "HEAD", path: "/api/resources/res_1/content", principal }))
       .toMatchObject({ allowed: true });
+    expect(authorizeHttpRoute({ method: "POST", path: "/api/resources/res_1/ticket", principal }))
+      .toMatchObject({ allowed: true });
 
     expect(authorizeHttpRoute({ method: "POST", path: "/api/resources/res_1/content", principal }))
       .toMatchObject({
