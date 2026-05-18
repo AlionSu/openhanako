@@ -1020,6 +1020,7 @@
       "searchProviderField": "搜索引擎",
       "searchApiKey": "搜索 API Key",
       "searchApiKeyHint": "启用搜索时请填写所选 provider 的 API Key",
+      "searchApiKeysAutoHint": "Auto 会优先使用已配置的 Tavily、Brave、Serper，额度耗尽、报错、空结果或相关性较弱时再回退到浏览器搜索。",
       "searchApiKeyNotRequired": "浏览器搜索不需要 API Key，会在本机后台打开搜索页并整理结果。",
       "favorites": "收藏",
       "searchModel": "搜索模型...",
