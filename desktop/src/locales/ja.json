@@ -674,6 +674,11 @@
       "leavesOverlay": "晴れモード",
       "leavesOverlayHint": "たまには日向ぼっこしよう"
     },
+    "interface": {
+      "system": "システム",
+      "hardwareAcceleration": "ハードウェアアクセラレーション",
+      "hardwareAccelerationHint": "GPU でウィンドウを描画します。オフにすると次回起動からソフトウェア描画を使い、Windows の GPU ドライバー起因の起動クラッシュ復旧に役立ちます。"
+    },
     "editor": {
       "title": "エディター",
       "markdownBodyFontSize": "本文サイズ",

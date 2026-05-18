@@ -674,6 +674,11 @@
       "leavesOverlay": "晴天模式",
       "leavesOverlayHint": "沒事兒曬曬太陽"
     },
+    "interface": {
+      "system": "系統",
+      "hardwareAcceleration": "硬體加速",
+      "hardwareAccelerationHint": "使用顯示卡繪製視窗內容。關閉後會在下次啟動使用軟體渲染，可用於恢復 Windows 顯示卡驅動導致的啟動閃退。"
+    },
     "editor": {
       "title": "編輯器",
       "markdownBodyFontSize": "正文字號",

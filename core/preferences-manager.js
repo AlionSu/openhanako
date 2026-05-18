@@ -93,6 +93,23 @@ export class PreferencesManager {
     this.savePreferences(prefs);
   }
 
+  /** 读取桌面硬件加速偏好。默认开启。 */
+  getHardwareAcceleration() {
+    return this._cache.hardware_acceleration !== false;
+  }
+
+  /** 保存桌面硬件加速偏好；主进程下次启动时生效。 */
+  setHardwareAcceleration(enabled) {
+    const prefs = this._mutableCopy();
+    if (typeof enabled === "string") {
+      const value = enabled.trim().toLowerCase();
+      prefs.hardware_acceleration = !["false", "0", "off", "no", "disabled"].includes(value);
+    } else {
+      prefs.hardware_acceleration = !!enabled;
+    }
+    this.savePreferences(prefs);
+  }
+
   /** 读取新会话默认权限模式。首次安装没有该字段时默认 ask。 */
   getSessionPermissionModeDefault() {
     return normalizeSessionPermissionMode({ permissionMode: this._cache.session_permission_mode_default });

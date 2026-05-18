@@ -674,6 +674,11 @@
       "leavesOverlay": "맑은 날 모드",
       "leavesOverlayHint": "가끔은 햇볕도 쬐어요"
     },
+    "interface": {
+      "system": "시스템",
+      "hardwareAcceleration": "하드웨어 가속",
+      "hardwareAccelerationHint": "GPU로 앱 창을 렌더링합니다. 끄면 다음 실행부터 소프트웨어 렌더링을 사용해 Windows GPU 드라이버로 인한 시작 충돌 복구에 도움이 됩니다."
+    },
     "editor": {
       "title": "편집기",
       "markdownBodyFontSize": "본문 크기",

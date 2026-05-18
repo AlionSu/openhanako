@@ -654,6 +654,11 @@
       "leavesOverlay": "Sunny Mode",
       "leavesOverlayHint": "Go touch some grass (and sunlight)"
     },
+    "interface": {
+      "system": "System",
+      "hardwareAcceleration": "Hardware Acceleration",
+      "hardwareAccelerationHint": "Use the GPU to render app windows. Turning this off takes effect on next launch and uses software rendering for Windows GPU-driver startup recovery."
+    },
     "editor": {
       "title": "Editor",
       "markdownBodyFontSize": "Body Size",

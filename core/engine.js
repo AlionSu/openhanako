@@ -742,6 +742,8 @@ export class HanaEngine {
   setSandbox(v) { this._prefs.setSandbox(v); }
   getSandboxNetwork() { return this._prefs.getSandboxNetwork(); }
   setSandboxNetwork(v) { this._prefs.setSandboxNetwork(v); }
+  getHardwareAcceleration() { return this._prefs.getHardwareAcceleration(); }
+  setHardwareAcceleration(v) { this._prefs.setHardwareAcceleration(v); }
   getFileBackup() { return this._prefs.getFileBackup(); }
   setFileBackup(p) { this._prefs.setFileBackup(p); }
   listCheckpoints() { return this._checkpointStore.list(); }
