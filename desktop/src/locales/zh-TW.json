@@ -1040,7 +1040,7 @@
       "searchProviderField": "搜尋引擎",
       "searchApiKey": "搜尋 API Key",
       "searchApiKeyHint": "啟用搜尋時請填寫所選 provider 的 API Key",
-      "searchApiKeysAutoHint": "Auto 會優先使用已設定的 Tavily、Brave、Serper，額度耗盡、報錯、空結果或相關性較弱時再回退到瀏覽器搜尋。",
+      "searchApiKeysAutoHint": "Auto 會優先使用已設定的 Tavily、Brave、Serper，然後使用 AnySearch 免費搜尋；額度耗盡、報錯、空結果或相關性較弱時再回退到瀏覽器搜尋。",
       "searchApiKeyNotRequired": "瀏覽器搜尋不需要 API Key，會在本機背景開啟搜尋頁並整理結果。",
       "favorites": "收藏",
       "searchModel": "搜尋模型...",

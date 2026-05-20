@@ -1040,7 +1040,7 @@
       "searchProviderField": "Search engine",
       "searchApiKey": "Search API Key",
       "searchApiKeyHint": "Enter the API key for the selected search provider",
-      "searchApiKeysAutoHint": "Auto uses configured Tavily, Brave, and Serper keys first, then falls back to browser search when quota, errors, empty results, or weak relevance get in the way.",
+      "searchApiKeysAutoHint": "Auto uses configured Tavily, Brave, and Serper keys first, then AnySearch free search, then browser search when quota, errors, empty results, or weak relevance get in the way.",
       "searchApiKeyNotRequired": "Browser search does not need an API key. It opens the search page locally in the background and structures the results.",
       "favorites": "Favorites",
       "searchModel": "Search models...",
