@@ -81,6 +81,17 @@ describe("Windows sandbox helper build script", () => {
     expect(source).toContain("hana-write-acl-cleaned");
   });
 
+  it("adds the Windows write-restricted SID to the restricted token", () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, "../desktop/native/HanaWindowsSandboxHelper/main.cpp"),
+      "utf8"
+    );
+
+    expect(source).toContain("S-1-5-33");
+    expect(source).toContain("appendRestrictingSid");
+    expect(source).toContain("WRITE_RESTRICTED_CODE_SID");
+  });
+
   it("restores temporary write ACL changes after sandboxed commands", () => {
     const source = fs.readFileSync(
       path.resolve(__dirname, "../desktop/native/HanaWindowsSandboxHelper/main.cpp"),
