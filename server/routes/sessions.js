@@ -31,7 +31,7 @@ import {
   isArchivedDesktopSessionPath,
 } from "../../core/message-utils.js";
 import {
-  loadLatestTodosFromSessionFile,
+  extractLatestTodos,
   loadLatestTodoSnapshotFromSessionFile,
 } from "../../lib/tools/todo-compat.js";
 import { SessionManager } from "../../lib/pi-sdk/index.js";
@@ -94,6 +94,53 @@ function authorizeSessionRoute(requestContext, capability, target) {
 
 const TODO_COMPLETE_MESSAGE =
   "[Hana Todo] The user marked the current todo list as completed and removed it from the session UI. Treat every item in that list as completed. Create a new todo list only if new work needs tracking.";
+
+function stripInlineThinkText(text) {
+  return String(text || "").replace(/<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>\n*/g, "");
+}
+
+function hasInlineImageContent(content) {
+  if (!Array.isArray(content)) return false;
+  return content.some(block => block?.type === "image" && (block.data || block.source?.data));
+}
+
+function hasTextBlockContent(content, { stripThink = false } = {}) {
+  if (typeof content === "string") {
+    const text = stripThink ? stripInlineThinkText(content) : content;
+    return text.length > 0;
+  }
+  if (!Array.isArray(content)) return false;
+  return content.some(block => block?.type === "text" && block.text);
+}
+
+function hasToolUseContent(content) {
+  if (!Array.isArray(content)) return false;
+  return content.some(block => (block?.type === "tool_use" || block?.type === "toolCall") && !!block.name);
+}
+
+function isDisplayableHistoryMessage(message) {
+  if (!message || typeof message !== "object") return false;
+  if (message.role === "user") {
+    return hasTextBlockContent(message.content) || hasInlineImageContent(message.content);
+  }
+  if (message.role === "assistant") {
+    return hasTextBlockContent(message.content, { stripThink: true }) || hasToolUseContent(message.content);
+  }
+  return false;
+}
+
+function resolveHistoryPageBounds(sourceMessages, { beforeId, limit, forceAll }) {
+  let total = 0;
+  for (const message of sourceMessages) {
+    if (isDisplayableHistoryMessage(message)) total += 1;
+  }
+  if (forceAll) return { total, startIdx: 0, endIdx: total, hasMore: false };
+  const endIdx = (beforeId != null && beforeId > 0)
+    ? Math.min(beforeId, total)
+    : total;
+  const startIdx = Math.max(0, endIdx - limit);
+  return { total, startIdx, endIdx, hasMore: startIdx > 0 };
+}
 
 export function createSessionsRoute(engine, hub = null) {
   const route = new Hono();
@@ -433,15 +480,20 @@ export function createSessionsRoute(engine, hub = null) {
       });
       if (!auth.allowed) return c.json({ error: "insufficient_scope", reason: auth.reason }, 403);
       const resolvedSessionPath = queryPath || engine.currentSessionPath || null;
-      const sourceMessages = await loadSessionHistoryMessages(engine, queryPath);
+      const sourceMessages = await loadSessionHistoryMessages(engine, resolvedSessionPath);
 
       // 分页参数
       const beforeId = c.req.query("before") != null ? Number(c.req.query("before")) : null;
       const limit = Math.min(Number(c.req.query("limit")) || 50, 200);
 
-      // 提取可显示的消息（user/assistant 文本 + 文件/artifact 工具结果）
-      // 每条消息带稳定 id（原始 sourceMessages 索引）
-      const allMessages = [];
+      // all=1 强制全量返回（流式恢复等特殊场景）
+      const forceAll = c.req.query("all") === "1";
+      const pageBounds = resolveHistoryPageBounds(sourceMessages, { beforeId, limit, forceAll });
+
+      // 提取可显示的消息（user/assistant 文本 + 文件/artifact 工具结果）。
+      // 长会话只完整 hydrate 当前页面窗口；窗口外只做轻量可见性扫描，
+      // 避免旧消息的 markdown/block/sidecar 解析拖慢当前模型运行。
+      const messages = [];
       const blocks = [];
       const mediaGenerationResults = new Map();
       const standaloneMediaGenerationResults = [];
@@ -455,28 +507,33 @@ export function createSessionsRoute(engine, hub = null) {
           });
         }
       };
-      let globalIdx = 0;
+      let displayIdx = 0;
 
       for (const m of sourceMessages) {
         if (m.role === "user") {
-          const { text, images } = extractTextContent(m.content);
-          const visibleImages = filterUnreferencedInlineImages(text, images);
-          if (text || visibleImages.length) {
-            allMessages.push({
-              id: String(globalIdx),
+          if (!isDisplayableHistoryMessage(m)) continue;
+          const currentIndex = displayIdx;
+          displayIdx += 1;
+          if (currentIndex >= pageBounds.startIdx && currentIndex < pageBounds.endIdx) {
+            const { text, images } = extractTextContent(m.content);
+            const visibleImages = filterUnreferencedInlineImages(text, images);
+            messages.push({
+              id: String(currentIndex),
               ...(m.id ? { entryId: m.id } : {}),
               role: "user",
               content: text,
               images: visibleImages.length ? visibleImages : undefined,
               ...(m.timestamp ? { timestamp: m.timestamp } : {}),
             });
-            globalIdx++;
           }
         } else if (m.role === "assistant") {
-          const { text, thinking, toolUses } = extractTextContent(m.content, { stripThink: true });
-          if (text || toolUses.length) {
-            allMessages.push({
-              id: String(globalIdx),
+          if (!isDisplayableHistoryMessage(m)) continue;
+          const currentIndex = displayIdx;
+          displayIdx += 1;
+          if (currentIndex >= pageBounds.startIdx && currentIndex < pageBounds.endIdx) {
+            const { text, thinking, toolUses } = extractTextContent(m.content, { stripThink: true });
+            messages.push({
+              id: String(currentIndex),
               ...(m.id ? { entryId: m.id } : {}),
               role: "assistant",
               content: text,
@@ -484,15 +541,17 @@ export function createSessionsRoute(engine, hub = null) {
               toolCalls: toolUses.length ? toolUses : undefined,
               ...(m.timestamp ? { timestamp: m.timestamp } : {}),
             });
-            globalIdx++;
           }
         } else if (m.role === "toolResult") {
-          const extracted = extractBlocks(m.toolName, m.details, m);
-          for (const b of extracted) {
-            blocks.push({ ...b, afterIndex: allMessages.length - 1 });
+          const afterIndex = displayIdx - 1;
+          if (afterIndex >= pageBounds.startIdx && afterIndex < pageBounds.endIdx) {
+            const extracted = extractBlocks(m.toolName, m.details, m);
+            for (const b of extracted) {
+              blocks.push({ ...b, afterIndex });
+            }
           }
         } else if (m.role === "custom") {
-          recordMediaGenerationResult(parseHistoryDeferredResult(m), allMessages.length - 1);
+          recordMediaGenerationResult(parseHistoryDeferredResult(m), displayIdx - 1);
         }
       }
 
@@ -500,7 +559,7 @@ export function createSessionsRoute(engine, hub = null) {
       if (resolvedSessionPath && typeof deferredStore?.listBySession === "function") {
         for (const task of deferredStore.listBySession(resolvedSessionPath)) {
           if (!isTerminalDeferredTask(task)) continue;
-          recordMediaGenerationResult(buildDeferredResultRecord(task.taskId, task), allMessages.length - 1);
+          recordMediaGenerationResult(buildDeferredResultRecord(task.taskId, task), pageBounds.total - 1);
         }
       }
       const resolvedBlocks = resolveMediaGenerationBlocks(
@@ -509,29 +568,13 @@ export function createSessionsRoute(engine, hub = null) {
         standaloneMediaGenerationResults,
       );
 
-      // 分页：before 参数指定游标，否则默认返回最后 limit 条
-      let messages;
-      let hasMore = false;
-      let slicedBlocks = resolvedBlocks;
-
-      const total = allMessages.length;
-      // all=1 强制全量返回（流式恢复等特殊场景）
-      const forceAll = c.req.query("all") === "1";
-
-      if (forceAll) {
-        messages = allMessages;
-      } else {
-        const endIdx = (beforeId != null && beforeId > 0)
-          ? Math.min(beforeId, total)
-          : total;
-        const startIdx = Math.max(0, endIdx - limit);
-        messages = allMessages.slice(startIdx, endIdx);
-        hasMore = startIdx > 0;
-        // 重映射 afterIndex 到切片内偏移，过滤超出范围的
-        slicedBlocks = resolvedBlocks
-          .filter(b => b.afterIndex >= startIdx && b.afterIndex < endIdx)
-          .map(b => ({ ...b, afterIndex: b.afterIndex - startIdx }));
-      }
+      // 重映射 afterIndex 到切片内偏移，过滤超出范围的
+      const slicedBlocks = forceAll
+        ? resolvedBlocks
+        : resolvedBlocks
+          .filter(b => b.afterIndex >= pageBounds.startIdx && b.afterIndex < pageBounds.endIdx)
+          .map(b => ({ ...b, afterIndex: b.afterIndex - pageBounds.startIdx }));
+      const hasMore = pageBounds.hasMore;
 
       // 修正 subagent blocks 的状态：优先从 durable run registry 读长期映射，
       // 再用 deferred store 作为实时投递队列。deferred 会清理，不再承担历史事实源。
@@ -609,7 +652,7 @@ export function createSessionsRoute(engine, hub = null) {
 
       // 从历史中提取最新 todo 状态：branch-aware，沿当前 leaf 回溯到 root，
       // 只在当前分支路径上找最新合法快照。避免从抛弃的分支取到错误状态。
-      const todos = await loadLatestTodosFromSessionFile(queryPath);
+      const todos = extractLatestTodos(sourceMessages);
 
       return c.json({ messages, blocks: slicedBlocks, todos, hasMore, sessionFiles });
     } catch (err) {

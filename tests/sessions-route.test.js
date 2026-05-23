@@ -684,6 +684,42 @@ describe("sessions route", () => {
     ]);
   });
 
+  it("hydrates only the requested display window for long session history", async () => {
+    const { createSessionsRoute } = await import("../server/routes/sessions.js");
+    const msgUtils = await import("../core/message-utils.js");
+    const app = new Hono();
+    const sourceMessages = Array.from({ length: 120 }, (_, i) => ({
+      role: "assistant",
+      content: `message ${i}`,
+    }));
+
+    vi.mocked(msgUtils.extractTextContent).mockClear();
+    vi.mocked(msgUtils.loadSessionHistoryMessages).mockResolvedValueOnce(sourceMessages);
+    vi.mocked(msgUtils.extractTextContent).mockImplementation((content) => ({
+      text: String(content),
+      images: [],
+      thinking: "",
+      toolUses: [],
+    }));
+
+    const engine = {
+      agentsDir: "/tmp/agents",
+      currentSessionPath: "/tmp/agents/hana/sessions/long.jsonl",
+      deferredResults: null,
+    };
+
+    app.route("/api", createSessionsRoute(engine));
+
+    const res = await app.request("/api/sessions/messages?limit=20");
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.messages).toHaveLength(20);
+    expect(data.messages[0]).toMatchObject({ id: "100", content: "message 100" });
+    expect(data.messages[19]).toMatchObject({ id: "119", content: "message 119" });
+    expect(msgUtils.extractTextContent).toHaveBeenCalledTimes(20);
+  });
+
   it("does not return path-backed inline image base64 in session history", async () => {
     const { createSessionsRoute } = await import("../server/routes/sessions.js");
     const msgUtils = await import("../core/message-utils.js");
