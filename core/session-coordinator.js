@@ -11,7 +11,10 @@ import path from "path";
 import { createAgentSession, SessionManager, estimateTokens, refreshSessionModelFromRegistry } from "../lib/pi-sdk/index.js";
 import { createDefaultSettings } from "./session-defaults.js";
 import { computeHardTruncation } from "./compaction-utils.js";
-import { runCachePreservingCompactionForSession } from "./session-compactor.js";
+import {
+  appendCompactionResultToSession,
+  runCachePreservingCompactionForSession,
+} from "./session-compactor.js";
 import { teardownSessionResources } from "./session-teardown.js";
 import { evaluateSessionHealth } from "./session-health.js";
 import { createModuleLogger } from "../lib/debug-log.js";
@@ -1222,8 +1225,9 @@ export class SessionCoordinator {
 
         // 尝试压缩
         try {
-          await this._compactWithModel(session, effectiveWindow, oldModel);
-          adaptations.push("compacted");
+          const compactionResult = await this._compactWithModel(session, effectiveWindow, oldModel);
+          const hardTruncated = compactionResult?.details?.reason === "cache-preserving-compaction-hard-truncate";
+          adaptations.push(hardTruncated ? "truncated" : "compacted");
         } catch (compactErr) {
           log.warn(`compactWithModel failed, falling back to hard truncate: ${compactErr.message}`);
           // 压缩失败，尝试硬截断
@@ -1268,13 +1272,15 @@ export class SessionCoordinator {
    * @private
    */
   async _compactWithModel(session, effectiveWindow, model) {
-    await runCachePreservingCompactionForSession(session, {
+    return await runCachePreservingCompactionForSession(session, {
       model,
       settings: {
         enabled: true,
         reserveTokens: 4000,
         keepRecentTokens: effectiveWindow,
       },
+      emitLifecycle: true,
+      lifecycleReason: "model_switch",
     });
   }
 
@@ -1285,19 +1291,39 @@ export class SessionCoordinator {
   async _hardTruncate(session, effectiveWindow) {
     const sm = session.sessionManager;
     const pathEntries = sm.getBranch();
+    const reason = "model_switch";
+    session?._emit?.({ type: "compaction_start", reason });
 
-    const result = computeHardTruncation(pathEntries, effectiveWindow, {
-      summary: "[由于模型切换，早期对话历史已被截断]",
-      reason: "model-switch-truncation",
-    });
-    if (!result) {
-      throw new Error("Cannot hard-truncate: not enough messages or cut at beginning");
+    try {
+      const result = computeHardTruncation(pathEntries, effectiveWindow, {
+        summary: "[由于模型切换，早期对话历史已被截断]",
+        reason: "model-switch-truncation",
+      });
+      if (!result) {
+        throw new Error("Cannot hard-truncate: not enough messages or cut at beginning");
+      }
+
+      const saved = await appendCompactionResultToSession(session, result, { fromExtension: false });
+      session?._emit?.({
+        type: "compaction_end",
+        reason,
+        result: saved,
+        aborted: false,
+        willRetry: false,
+      });
+      return saved;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      session?._emit?.({
+        type: "compaction_end",
+        reason,
+        result: undefined,
+        aborted: false,
+        willRetry: false,
+        errorMessage: `Compaction failed: ${message}`,
+      });
+      throw error;
     }
-
-    sm.appendCompaction(result.summary, result.firstKeptEntryId, result.tokensBefore, result.details);
-
-    const ctx = sm.buildSessionContext();
-    session.agent.replaceMessages(ctx.messages);
   }
 
   /** Get plan mode for the current (focused) session */

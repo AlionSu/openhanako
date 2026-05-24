@@ -188,12 +188,8 @@ describe("CompactionGuardExtension", () => {
         systemPrompt: "system prompt",
         customInstructions: undefined,
         thinkingLevel: "off",
-        tools: [{
-          name: "read",
-          description: "Read files",
-          parameters: { type: "object", properties: {} },
-        }],
       }));
+      expect(cacheCompactor.mock.calls[0][0].tools).toBeUndefined();
       expect(computeHardTruncation).not.toHaveBeenCalled();
     });
 
@@ -214,6 +210,47 @@ describe("CompactionGuardExtension", () => {
 
       expect(cacheCompactor.mock.calls[0][0].messages).toHaveLength(2);
       expect(cacheCompactor.mock.calls[0][0].messages[1]).toMatchObject({ role: "assistant" });
+    });
+
+    it("returns hard truncation when the full cache-preserving request would exceed the budget", async () => {
+      estimatePreparationTokens.mockReturnValue(100); // old Pi summarizer estimate fits
+      computeHardTruncation.mockReturnValue({
+        summary: "[hard truncated for full request]",
+        firstKeptEntryId: "uuid-42",
+        tokensBefore: 90_000,
+        details: { reason: "compaction-guard-hard-truncate" },
+      });
+      const branch = [{ type: "message", id: "a" }, { type: "message", id: "b" }];
+      const tinyModel = { ...model, contextWindow: 1000 };
+      const res = await pi.trigger(
+        "session_before_compact",
+        { preparation: { ...preparation, settings: { keepRecentTokens: 100, reserveTokens: 512 } }, signal: { aborted: false } },
+        {
+          ...ctx,
+          model: tinyModel,
+          getSystemPrompt: vi.fn(() => "system " + "x".repeat(1000)),
+          sessionManager: {
+            ...ctx.sessionManager,
+            getBranch: () => branch,
+            buildSessionContext: () => ({
+              messages: [{ role: "user", content: [{ type: "text", text: "x".repeat(6000) }], timestamp: 1 }],
+            }),
+          },
+        },
+      );
+
+      expect(res).toEqual({
+        compaction: {
+          summary: "[hard truncated for full request]",
+          firstKeptEntryId: "uuid-42",
+          tokensBefore: 90_000,
+          details: { reason: "compaction-guard-hard-truncate" },
+        },
+      });
+      expect(computeHardTruncation).toHaveBeenCalledWith(branch, 100, expect.objectContaining({
+        reason: "compaction-guard-hard-truncate",
+      }));
+      expect(cacheCompactor).not.toHaveBeenCalled();
     });
 
     it("returns hard truncation when summarize tokens exceed threshold", async () => {
