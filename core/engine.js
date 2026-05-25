@@ -110,6 +110,7 @@ import {
 import { debugLog, createModuleLogger } from "../lib/debug-log.js";
 import { createSandboxedTools } from "../lib/sandbox/index.js";
 import { externalReadPathsFromSessionFiles } from "../lib/sandbox/win32-policy.js";
+import { Win32LegacySandboxCleanupQueue } from "../lib/sandbox/win32-legacy-migration.js";
 import { t } from "../server/i18n.js";
 import { CheckpointStore } from "../lib/checkpoint-store.js";
 import { assertAllToolsCategorized } from "../shared/tool-categories.js";
@@ -139,6 +140,7 @@ import {
 
 const moduleLog = createModuleLogger("engine");
 const toolAvailabilityLog = createModuleLogger("tool-availability");
+const win32SandboxCleanupLog = createModuleLogger("win32-sandbox-cleanup");
 
 export class HanaEngine {
   /**
@@ -357,6 +359,12 @@ export class HanaEngine {
     this._devLogsMax = 200;
 
     this._outboundProxyRuntime = null;
+    this._win32LegacySandboxCleanupQueue = process.platform === "win32"
+      ? new Win32LegacySandboxCleanupQueue({
+          hanakoHome: this.hanakoHome,
+          log: win32SandboxCleanupLog,
+        })
+      : null;
 
     // 设置起始 agentId
     this._agentMgr.activeAgentId = startId;
@@ -767,6 +775,9 @@ export class HanaEngine {
   setSessionThinkingLevel(sessionPath, level) { return this._sessionCoord.setSessionThinkingLevel(sessionPath, level); }
   getSandbox() { return this._prefs.getSandbox(); }
   setSandbox(v) { this._prefs.setSandbox(v); }
+  startWin32LegacySandboxMaintenance() {
+    this._win32LegacySandboxCleanupQueue?.enqueueProfileCleanup?.();
+  }
   getSandboxNetwork() {
     if (process.platform === "win32") return true;
     return this._prefs.getSandboxNetwork();
@@ -1545,6 +1556,7 @@ export class HanaEngine {
       recordFileOperation: (entry) => this.registerSessionFile(entry),
       getVisionBridge: () => this.getVisionBridge(),
       isVisionAuxiliaryEnabled: () => this.isVisionAuxiliaryEnabled(),
+      legacyCleanupQueue: this._win32LegacySandboxCleanupQueue,
     });
 
     // Checkpoint wrapper (outside sandbox layer)
