@@ -701,7 +701,7 @@
     "editor": {
       "title": "편집기",
       "markdownBodyFontSize": "본문 크기",
-      "markdownBodyFontSizeHint": "Markdown 편집기 본문은 Notion에 가까운 16px를 기본값으로 사용해요.",
+      "markdownBodyFontSizeHint": "Markdown 편집기 본문은 15px를 기본값으로 사용해요.",
       "markdownHeading1FontSize": "제목 1 크기",
       "markdownHeading1FontSizeHint": "# 제목에 사용돼요.",
       "markdownHeading2FontSize": "제목 2 크기",

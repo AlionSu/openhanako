@@ -678,7 +678,7 @@
     "editor": {
       "title": "Editor",
       "markdownBodyFontSize": "Body Size",
-      "markdownBodyFontSizeHint": "Markdown body text defaults to a Notion-like 16px.",
+      "markdownBodyFontSizeHint": "Markdown body text defaults to 15px.",
       "markdownHeading1FontSize": "Heading 1 Size",
       "markdownHeading1FontSizeHint": "Used for # headings.",
       "markdownHeading2FontSize": "Heading 2 Size",

@@ -701,7 +701,7 @@
     "editor": {
       "title": "エディター",
       "markdownBodyFontSize": "本文サイズ",
-      "markdownBodyFontSizeHint": "Markdown エディターの本文は、Notion に近い 16px を既定にします。",
+      "markdownBodyFontSizeHint": "Markdown エディターの本文は、15px を既定にします。",
       "markdownHeading1FontSize": "見出し 1 サイズ",
       "markdownHeading1FontSizeHint": "# 見出しに使用します。",
       "markdownHeading2FontSize": "見出し 2 サイズ",

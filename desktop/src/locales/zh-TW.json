@@ -701,7 +701,7 @@
     "editor": {
       "title": "編輯器",
       "markdownBodyFontSize": "正文字號",
-      "markdownBodyFontSizeHint": "Markdown 編輯器正文預設使用接近 Notion 的 16px。",
+      "markdownBodyFontSizeHint": "Markdown 編輯器正文預設使用 15px。",
       "markdownHeading1FontSize": "一級標題字號",
       "markdownHeading1FontSizeHint": "用於 # 標題。",
       "markdownHeading2FontSize": "二級標題字號",
