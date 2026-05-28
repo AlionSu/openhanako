@@ -592,6 +592,10 @@
     padding-left: 0;
 }
 
+.projectSessionList:not(:empty) {
+    padding-top: 1px;
+}
+
 .projectNameDialogBackdrop {
     position: fixed;
     inset: 0;
