@@ -173,17 +173,22 @@ export function scopeAllows(scopes, required) {
 
 function isMobileStaticRoute(verb, routePath) {
   if (verb !== "GET" && verb !== "HEAD") return false;
-  return routePath === "/mobile"
-    || routePath === "/mobile/"
-    || routePath === "/mobile/index.html"
-    || routePath === "/mobile/manifest.webmanifest"
-    || routePath === "/mobile/sw.js"
-    || routePath === "/mobile/icon.png"
-    || routePath.startsWith("/mobile/assets/")
-    || routePath.startsWith("/mobile/lib/")
-    || routePath.startsWith("/mobile/themes/")
-    || routePath.startsWith("/mobile/locales/")
-    || routePath.startsWith("/mobile/icons/");
+  return isWebClientStaticRoute(routePath, "/mobile")
+    || isWebClientStaticRoute(routePath, "/desktop");
+}
+
+function isWebClientStaticRoute(routePath, prefix) {
+  return routePath === prefix
+    || routePath === `${prefix}/`
+    || routePath === `${prefix}/index.html`
+    || routePath === `${prefix}/manifest.webmanifest`
+    || routePath === `${prefix}/sw.js`
+    || routePath === `${prefix}/icon.png`
+    || routePath.startsWith(`${prefix}/assets/`)
+    || routePath.startsWith(`${prefix}/lib/`)
+    || routePath.startsWith(`${prefix}/themes/`)
+    || routePath.startsWith(`${prefix}/locales/`)
+    || routePath.startsWith(`${prefix}/icons/`);
 }
 
 function isWebAuthBootstrapRoute(verb, routePath) {
