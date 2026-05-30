@@ -817,8 +817,6 @@ export class HanaEngine {
   }
   approveComputerUseApp(approval) { return this._prefs.approveComputerUseApp(approval); }
   revokeComputerUseApp(approval) { return this._prefs.revokeComputerUseApp(approval); }
-  getWorkflowSettings() { return this._prefs.getWorkflowSettings(); }
-  setWorkflowSettings(partial) { return this._prefs.setWorkflowSettings(partial); }
   resolveVisionConfig() {
     if (!this.isVisionAuxiliaryEnabled()) return null;
     const ref = this.getSharedModels()?.vision || null;

@@ -664,7 +664,6 @@
       "memory": "記憶",
       "work": "工作台",
       "computer": "使用電腦",
-      "workflow": "Workflow",
       "skills": "技能",
       "mcp": "連接器",
       "bridge": "社群平台",
@@ -696,11 +695,6 @@
       "requestPermissions": "請求系統權限",
       "requestPermissionsFailed": "請求系統權限失敗",
       "refresh": "刷新"
-    },
-    "workflow": {
-      "title": "Workflow",
-      "enabled": "Workflow 編排",
-      "enabledHint": "允許模型執行確定性的多 agent 編排腳本。預設關閉。"
     },
     "appearance": {
       "title": "外觀",

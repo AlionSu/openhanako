@@ -13,7 +13,6 @@ import {
   revokeComputerUseApp,
 } from "./computer-use/settings.js";
 import { normalizeSessionPermissionMode } from "./session-permission-mode.js";
-import { normalizeWorkflowSettings } from "./workflow/settings.js";
 import {
   mergeEditorTypography,
   normalizeEditorTypography,
@@ -299,21 +298,6 @@ export class PreferencesManager {
     prefs.computer_use = revokeComputerUseApp(prefs.computer_use || {}, approval);
     this.savePreferences(prefs);
     return prefs.computer_use;
-  }
-
-  /** 读取 workflow 工具全局设置（默认关闭）。 */
-  getWorkflowSettings() {
-    return normalizeWorkflowSettings(this._cache.workflow || {});
-  }
-
-  /** 合并写入 workflow 设置；关闭时清掉字段，让读时走默认（不持久化显式 false）。 */
-  setWorkflowSettings(partial) {
-    const prefs = this._mutableCopy();
-    const next = normalizeWorkflowSettings({ ...(prefs.workflow || {}), ...(partial || {}) });
-    if (next.enabled === true) prefs.workflow = next;
-    else delete prefs.workflow;
-    this.savePreferences(prefs);
-    return this.getWorkflowSettings();
   }
 
   /** 读取技能安装配置（全局，跨 agent） */

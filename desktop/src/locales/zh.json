@@ -664,7 +664,6 @@
       "memory": "记忆",
       "work": "工作台",
       "computer": "使用电脑",
-      "workflow": "Workflow",
       "skills": "技能",
       "mcp": "连接器",
       "bridge": "社交平台",
@@ -762,11 +761,6 @@
       "requestPermissions": "请求系统权限",
       "requestPermissionsFailed": "请求系统权限失败",
       "refresh": "刷新"
-    },
-    "workflow": {
-      "title": "Workflow",
-      "enabled": "Workflow 编排",
-      "enabledHint": "允许模型运行确定性的多 agent 编排脚本。默认关闭。"
     },
     "agent": {
       "title": "助手",
