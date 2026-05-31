@@ -516,6 +516,8 @@ export class Agent {
       getDeferredStore: () => this._cb?.getDeferredResults?.(),
       getSubagentRunStore: () => this._cb?.getSubagentRunStore?.(),
       getActivityHub: () => this._cb?.getActivityHub?.(),
+      // 节点 token：从 UsageLedger 按子节点 session 汇总（usage 已在 executeIsolated 采集）。
+      getUsageLedger: () => this._cb?.getEngine?.()?.usageLedger,
     });
 
     // 12. 组装 system prompt（按 master 构建，与 per-session 开关解耦）

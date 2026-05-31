@@ -188,4 +188,35 @@ describe("workflow tool", () => {
     expect(upserts.find((e) => e.id === childId && e.childSessionPath === "/child.jsonl")).toBeTruthy();
     expect(upserts.find((e) => e.id === childId && e.status === "done")).toBeTruthy();
   });
+
+  it("节点 done 从 UsageLedger 按 childSessionPath 汇总 token 写入子 entry", async () => {
+    const store = makeStore();
+    const upserts = [];
+    const hub = {
+      upsert: (e) => { upserts.push({ ...e }); return e; },
+      get: (id) => {
+        const merged = {};
+        for (const u of upserts) if (u.id === id) Object.assign(merged, u);
+        return merged.id ? merged : null;
+      },
+    };
+    const ledger = {
+      list: ({ childSessionPath }) => ({
+        entries: childSessionPath === "/child.jsonl"
+          ? [{ usage: { totalTokens: 1000 } }, { usage: { totalTokens: 234 } }]
+          : [],
+      }),
+    };
+    const tool = createWorkflowTool({
+      executeIsolated: async (p, o) => { o.onSessionReady?.("/child.jsonl"); return { replyText: "x", error: null }; },
+      getAgentId: () => "a1", emitEvent: () => {},
+      getDeferredStore: () => store, getSubagentRunStore: () => makeRunStore(),
+      getActivityHub: () => hub, getUsageLedger: () => ledger,
+    });
+    const res = await tool.execute("c1", { script: META + `return await agent('x')` }, undefined, undefined, makeCtx());
+    await flush();
+    const childId = `${res.details.taskId}::node-1`;
+    const done = upserts.find((e) => e.id === childId && e.status === "done");
+    expect(done.tokens).toBe(1234); // 1000 + 234
+  });
 });
