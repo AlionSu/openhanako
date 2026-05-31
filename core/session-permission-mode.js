@@ -41,6 +41,12 @@ const SIDE_EFFECT_TOOLS = new Set([
   "unpin_memory",
 ]);
 
+// subagent 上下文固定边界（与 permission mode 无关）：防自递归。收口在拦截层而非剥离——
+// subagent 工具对模型仍可见，调用时被拦（Codex 式甲）。未来要加更多 subagent 禁用工具加到这里。
+const SUBAGENT_BLOCKED_TOOLS = new Set([
+  "subagent",
+]);
+
 const BROWSER_READ_ACTIONS = new Set([
   "start",
   "navigate",
@@ -76,11 +82,11 @@ export function isReadOnlyPermissionMode(mode) {
   return normalizeSessionPermissionMode(mode) === SESSION_PERMISSION_MODES.READ_ONLY;
 }
 
-function blocked(toolName) {
+function blocked(toolName, { code = "ACTION_BLOCKED_BY_READ_ONLY", message } = {}) {
   return {
     action: "deny",
-    code: "ACTION_BLOCKED_BY_READ_ONLY",
-    message: `${toolName} is blocked in read-only mode.`,
+    code,
+    message: message || `${toolName} is blocked in read-only mode.`,
     details: { toolName },
   };
 }
@@ -107,10 +113,14 @@ function classifyTerminalAction(mode, action) {
   return { action: "allow" };
 }
 
-export function classifySessionPermission({ mode, toolName, params } = {}) {
+export function classifySessionPermission({ mode, toolName, params, context } = {}) {
   const normalized = normalizeSessionPermissionMode(mode);
   const name = typeof toolName === "string" ? toolName : "";
   if (!name) return { action: "allow" };
+  // subagent 上下文固定边界（与 mode 无关，优先于其它判定）：防自递归。
+  if (context?.isSubagent && SUBAGENT_BLOCKED_TOOLS.has(name)) {
+    return blocked(name, { code: "ACTION_BLOCKED_IN_SUBAGENT", message: `${name} is not available inside a subagent.` });
+  }
   if (INFORMATION_TOOLS.has(name)) return { action: "allow" };
   if (name === "browser") return classifyBrowserAction(normalized, params?.action);
   if (name === "terminal") return classifyTerminalAction(normalized, params?.action);

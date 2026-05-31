@@ -48,4 +48,19 @@ describe("session permission modes", () => {
     });
     expect(classifySessionPermission({ mode: "operate", toolName: "terminal", params: { action: "close" } })).toEqual({ action: "allow" });
   });
+
+  it("blocks subagent tool inside a subagent (anti-recursion), independent of mode", () => {
+    // subagent 上下文：subagent 工具被拦，无论什么 mode（防自递归，拦截层而非剥离）
+    expect(classifySessionPermission({ mode: "operate", toolName: "subagent", context: { isSubagent: true } }))
+      .toMatchObject({ action: "deny", code: "ACTION_BLOCKED_IN_SUBAGENT" });
+    expect(classifySessionPermission({ mode: "read_only", toolName: "subagent", context: { isSubagent: true } }))
+      .toMatchObject({ action: "deny", code: "ACTION_BLOCKED_IN_SUBAGENT" });
+    // 非 subagent 上下文：subagent 工具按常规（operate 放行）
+    expect(classifySessionPermission({ mode: "operate", toolName: "subagent" })).toEqual({ action: "allow" });
+    // subagent 上下文里其它工具不受这条影响：read 放行、write 仍按 mode
+    expect(classifySessionPermission({ mode: "operate", toolName: "read", context: { isSubagent: true } })).toEqual({ action: "allow" });
+    expect(classifySessionPermission({ mode: "operate", toolName: "write", context: { isSubagent: true } })).toEqual({ action: "allow" });
+    expect(classifySessionPermission({ mode: "read_only", toolName: "write", context: { isSubagent: true } }))
+      .toMatchObject({ action: "deny", code: "ACTION_BLOCKED_BY_READ_ONLY" });
+  });
 });
