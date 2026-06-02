@@ -509,11 +509,17 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
       }
       // 只保留前端 extractToolDetail 需要的字段，避免广播完整文件内容
       const args = summarizeToolStartArgs(event.toolName || "", event.args);
-      emitStreamEvent(sessionPath, ss, { type: "tool_start", name: event.toolName || "", args });
+      emitStreamEvent(sessionPath, ss, {
+        type: "tool_start",
+        id: event.toolCallId || undefined,
+        name: event.toolName || "",
+        args,
+      });
     } else if (event.type === "tool_execution_end") {
       if (!ss) return;
       emitStreamEvent(sessionPath, ss, {
         type: "tool_end",
+        id: event.toolCallId || undefined,
         name: event.toolName || "",
         success: !event.isError,
         details: event.result?.details,

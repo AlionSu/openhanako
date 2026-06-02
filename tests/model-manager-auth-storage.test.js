@@ -253,6 +253,7 @@ describe("ModelManager AuthStorage ownership", () => {
       api_key: "fresh-token",
       base_url: "https://chatgpt.com/backend-api",
       api: "openai-codex-responses",
+      headers: {},
       accountId: "acct_123",
     });
   });

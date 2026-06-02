@@ -11,6 +11,7 @@ import type { FileVersion } from '../types';
 // ── 工具调用 ──
 
 export interface ToolCall {
+  id?: string;
   name: string;
   args?: Record<string, unknown>;
   done: boolean;

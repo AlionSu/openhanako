@@ -287,7 +287,7 @@ export function handleServerMessage(msg: any): void {
   }
 
   if (msg.type !== 'stream_resume' && isStreamScopedMessage(msg)) {
-    updateSessionStreamMeta(msg);
+    if (!updateSessionStreamMeta(msg)) return;
   }
 
   if (msg.type === 'compaction_start' || msg.type === 'compaction_end') {
