@@ -210,6 +210,10 @@ export function applyStreamingStatus(isStreaming: boolean, sessionPath: string |
 
   if (!isStreaming && wasStreaming) {
     requestInputFocusForCurrentSession(sessionPath);
+    const focused = useStore.getState().currentSessionPath;
+    if (sessionPath && sessionPath !== focused) {
+      useStore.getState().markSessionOutputUnread?.(sessionPath);
+    }
   }
 
   // 渲染层：只有焦点 session 才影响 UI 占位 / sessions 列表。

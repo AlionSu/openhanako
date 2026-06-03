@@ -63,6 +63,7 @@ describe('ws-message-handler applyStreamingStatus', () => {
       pendingNewSession: false,
       sessions: [],
       streamingSessions: [],
+      unreadOutputSessionPaths: [],
       inlineErrors: {},
     } as never);
   });
@@ -94,6 +95,24 @@ describe('ws-message-handler applyStreamingStatus', () => {
     useStore.setState({ streamingSessions: ['/focused.jsonl'] } as never);
     expect(() => applyStreamingStatus(false, null)).not.toThrow();
     expect(useStore.getState().streamingSessions).toEqual(['/focused.jsonl']);
+  });
+
+  it('后台 session 从 streaming 变为完成时标记未读输出', () => {
+    useStore.setState({ streamingSessions: ['/other.jsonl'], unreadOutputSessionPaths: [] } as never);
+    applyStreamingStatus(false, '/other.jsonl');
+    expect(useStore.getState().unreadOutputSessionPaths).toEqual(['/other.jsonl']);
+  });
+
+  it('当前焦点 session 完成时不标记未读输出', () => {
+    useStore.setState({ streamingSessions: ['/focused.jsonl'], unreadOutputSessionPaths: [] } as never);
+    applyStreamingStatus(false, '/focused.jsonl');
+    expect(useStore.getState().unreadOutputSessionPaths).toEqual([]);
+  });
+
+  it('收到 isStreaming=true 只维护运行集合，不产生未读输出标记', () => {
+    applyStreamingStatus(true, '/other.jsonl');
+    expect(useStore.getState().streamingSessions).toEqual(['/other.jsonl']);
+    expect(useStore.getState().unreadOutputSessionPaths).toEqual([]);
   });
 });
 

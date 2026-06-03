@@ -228,6 +228,7 @@ function SessionListInner() {
   const pendingNewSession = useStore(s => s.pendingNewSession);
   const agents = useStore(s => s.agents);
   const streamingSessions = useStore(s => s.streamingSessions);
+  const unreadOutputSessionPaths = useStore(s => s.unreadOutputSessionPaths);
   const browserBySession = useStore(s => s.browserBySession);
   const projectCatalog = useStore(s => s.sessionProjectCatalog);
   const projectCatalogLoaded = useStore(s => s.sessionProjectCatalogLoaded);
@@ -611,6 +612,7 @@ function SessionListInner() {
       isActive={!pendingNewSession && s.path === activeSessionPath}
       isStreaming={streamingSessions.includes(s.path)}
       isPinned={!!s.pinnedAt}
+      hasUnreadOutput={unreadOutputSessionPaths.includes(s.path)}
       agents={agents}
       browserState={browserSessions[s.path] || null}
       onCloseBrowser={handleCloseBrowserSession}
@@ -1275,6 +1277,16 @@ function PinIcon() {
   );
 }
 
+function BrowserStatusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M4 9h16" />
+      <path d="M8 7h.01M11 7h.01" />
+    </svg>
+  );
+}
+
 function ProjectPlusIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1466,11 +1478,12 @@ const SessionSearchItem = memo(function SessionSearchItem({
 
 // ── Session Item ──
 
-const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, agents, browserState, onCloseBrowser, draggable = false, onDragStart, onDragEnd }: {
+const SessionItem = memo(function SessionItem({ session: s, isActive, isStreaming, isPinned, hasUnreadOutput, agents, browserState, onCloseBrowser, draggable = false, onDragStart, onDragEnd }: {
   session: Session;
   isActive: boolean;
   isStreaming: boolean;
   isPinned: boolean;
+  hasUnreadOutput: boolean;
   agents: Agent[];
   browserState: BrowserSessionState | null;
   onCloseBrowser: (sessionPath: string) => void;
@@ -1508,11 +1521,6 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
     setEditValue(s.title || s.firstMessage || '');
     setEditing(true);
   }, [isDeletedAgentSession, s.title, s.firstMessage]);
-
-  const startRename = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    beginRename();
-  }, [beginRename]);
 
   const commitRename = useCallback(() => {
     const trimmed = editValue.trim();
@@ -1558,6 +1566,9 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
   if (s.modified) parts.push(formatSessionDate(s.modified));
   const rcLabel = s.rcAttachment ? `${formatRcPlatform(s.rcAttachment.platform)} 接管中` : null;
   const browserUrl = browserState?.url || null;
+  const hasStatusSlot = !!browserUrl;
+  const showStatusDot = isStreaming || hasUnreadOutput;
+  const statusDotState = isStreaming ? 'running' : 'unread';
   const browserTitle = [
     browserUrl,
     browserState?.unavailableReason,
@@ -1580,6 +1591,7 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
       <button
         className={`${styles.sessionItem}${isActive ? ` ${styles.sessionItemActive}` : ''}${isDeletedAgentSession ? ` ${styles.sessionItemReadOnly}` : ''}`}
         data-session-path={s.path}
+        data-unread-output={hasUnreadOutput ? 'true' : 'false'}
         draggable={draggable && !editing && !isDeletedAgentSession}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
@@ -1590,7 +1602,14 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
           {s.agentId && (
             <AgentBadge agentId={s.agentId} agentName={s.agentName} agents={agents} />
           )}
-          {isStreaming && <span className={styles.sessionStreamingDot} />}
+          {showStatusDot && (
+            <span
+              className={styles.sessionStreamingDot}
+              data-session-status-dot=""
+              data-state={statusDotState}
+              aria-hidden="true"
+            />
+          )}
           {editing ? (
             <input
               ref={inputRef}
@@ -1606,24 +1625,30 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
               {s.title || s.firstMessage || t('session.untitled')}
             </div>
           )}
+          {hasStatusSlot && (
+            <div className={styles.sessionStatusSlot}>
+              {browserUrl && (
+                <span
+                  className={styles.sessionBrowserBadge}
+                  title={browserTitle}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('browser.close')}
+                  data-running={browserState?.running ? 'true' : 'false'}
+                  data-resumable={browserState?.resumable ? 'true' : 'false'}
+                  onClick={handleBrowserClose}
+                  onKeyDown={handleBrowserKeyDown}
+                >
+                  <BrowserStatusIcon />
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {!editing && !isDeletedAgentSession && (
           <div className={styles.sessionPinBtn} title={t(isPinned ? 'session.unpin' : 'session.pin')} onClick={handlePin}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 17v5" />
-              <path d="M5 17h14" />
-              <path d="M7 3h10l-2 9H9L7 3z" />
-              <path d="M9 12l-2 5h10l-2-5" />
-            </svg>
-          </div>
-        )}
-
-        {!editing && !isDeletedAgentSession && (
-          <div className={styles.sessionRenameBtn} title={t('session.rename')} onClick={startRename}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-            </svg>
+            <PinIcon />
           </div>
         )}
 
@@ -1647,25 +1672,6 @@ const SessionItem = memo(function SessionItem({ session: s, isActive, isStreamin
           </div>
         )}
 
-        {browserUrl && (
-          <span
-            className={styles.sessionBrowserBadge}
-            title={browserTitle}
-            role="button"
-            tabIndex={0}
-            aria-label={t('browser.close')}
-            data-running={browserState?.running ? 'true' : 'false'}
-            data-resumable={browserState?.resumable ? 'true' : 'false'}
-            onClick={handleBrowserClose}
-            onKeyDown={handleBrowserKeyDown}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-            </svg>
-          </span>
-        )}
       </button>
       {menuPosition && (
         <SessionContextMenu

@@ -34,6 +34,7 @@ const initialStateFactory = (): MockState => ({
   attachedFilesBySession: {} as Record<string, unknown>,
   drafts: {} as Record<string, string>,
   streamingSessions: [] as string[],
+  unreadOutputSessionPaths: [] as string[],
   inlineErrors: {} as Record<string, string | null>,
   addToast: vi.fn(),
   activePanel: null,
@@ -302,6 +303,60 @@ function jsonResponse(body: unknown, ok = true): Response {
     expect(mockState.currentAgentId).toBeNull();
     expect(deskActionMocks.activateWorkspaceDesk).toHaveBeenCalledWith('/tmp/work');
     expect((mockState.chatSessions as Record<string, any>)[deletedPath].items).toHaveLength(1);
+  });
+
+  it('clears unread output marker when switching into a normal session', async () => {
+    Object.assign(mockState, {
+      currentSessionPath: '/session/current.jsonl',
+      unreadOutputSessionPaths: ['/session/next.jsonl', '/session/other.jsonl'],
+      sessions: [{ path: '/session/next.jsonl', cwd: '/tmp/work' }],
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url === '/api/sessions/switch') {
+        return jsonResponse({
+          ok: true,
+          path: '/session/next.jsonl',
+          cwd: '/tmp/work',
+          workspaceFolders: [],
+          memoryEnabled: true,
+          permissionMode: 'ask',
+          accessMode: 'ask',
+        });
+      }
+      if (String(url).startsWith('/api/sessions/messages')) {
+        return jsonResponse({ messages: [], blocks: [], todos: [], hasMore: false });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await switchSession('/session/next.jsonl');
+
+    expect(mockState.unreadOutputSessionPaths).toEqual(['/session/other.jsonl']);
+  });
+
+  it('clears unread output marker when switching into a deleted-agent history session', async () => {
+    const deletedPath = '/tmp/agents/deleted/sessions/unread.jsonl';
+    Object.assign(mockState, {
+      currentSessionPath: '/session/current.jsonl',
+      unreadOutputSessionPaths: [deletedPath, '/session/other.jsonl'],
+      sessions: [{
+        path: deletedPath,
+        agentDeleted: true,
+        agentId: 'deleted',
+        agentName: 'Deleted',
+        cwd: '/tmp/work',
+      }],
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (String(url).startsWith('/api/sessions/messages')) {
+        return jsonResponse({ messages: [], blocks: [], todos: [], hasMore: false });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+
+    await switchSession(deletedPath);
+
+    expect(mockState.unreadOutputSessionPaths).toEqual(['/session/other.jsonl']);
   });
 
   it('continues a deleted-agent session by creating and switching to the returned primary-agent session', async () => {

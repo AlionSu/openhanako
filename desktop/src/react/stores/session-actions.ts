@@ -102,6 +102,7 @@ function clearSessionRuntimeCaches(path: string): void {
       computerOverlayBySession,
       scrollPositions,
       streamingSessions: (s.streamingSessions || []).filter((sessionPath: string) => sessionPath !== path),
+      unreadOutputSessionPaths: (s.unreadOutputSessionPaths || []).filter((sessionPath: string) => sessionPath !== path),
       todosBySession,
       todosLiveVersionBySession,
       sessionAuthorizedFoldersByPath,
@@ -258,7 +259,10 @@ export async function switchSession(path: string): Promise<void> {
   _switchAbortController = null;
 
   if (path === s.currentSessionPath && !s.pendingNewSession) {
-    useStore.setState({ pendingSessionSwitchPath: null });
+    useStore.setState(state => ({
+      pendingSessionSwitchPath: null,
+      unreadOutputSessionPaths: (state.unreadOutputSessionPaths || []).filter((sessionPath: string) => sessionPath !== path),
+    }));
     return;
   }
 
@@ -341,6 +345,7 @@ export async function switchSession(path: string): Promise<void> {
       welcomeVisible: false,
       memoryEnabled: data.memoryEnabled !== false,
       streamingSessions,
+      unreadOutputSessionPaths: (state.unreadOutputSessionPaths || []).filter((sessionPath: string) => sessionPath !== path),
       attachedFiles: state.attachedFilesBySession[path] || [],
       deskContextAttached: false,
       docContextAttached: false,
@@ -452,6 +457,7 @@ async function switchDeletedAgentSession(path: string, version: number): Promise
     selectedAgentId: null,
     welcomeVisible: false,
     streamingSessions: state.streamingSessions.filter((sessionPath: string) => sessionPath !== path),
+    unreadOutputSessionPaths: (state.unreadOutputSessionPaths || []).filter((sessionPath: string) => sessionPath !== path),
     attachedFiles: state.attachedFilesBySession[path] || [],
     deskContextAttached: false,
     docContextAttached: false,
