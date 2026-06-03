@@ -259,6 +259,91 @@ describe("submitDesktopSessionMessage", () => {
     );
   });
 
+  it("forwards audios to promptSession and records attached audio markers", async () => {
+    const session = makeFakeSession();
+    const engine = {
+      ensureSessionLoaded: vi.fn(async () => session),
+      promptSession: vi.fn(async (sessionPath, text, opts) => session.prompt(text, opts)),
+      emitEvent: vi.fn(),
+      setUiContext: vi.fn(),
+    };
+
+    await submitDesktopSessionMessage(engine, {
+      sessionPath: "/tmp/desk.jsonl",
+      text: "hear audio",
+      audios: [{ type: "audio", data: "BASE64", mimeType: "audio/wav" }],
+      audioAttachmentPaths: ["/tmp/upload.wav"],
+      displayMessage: { text: "hear audio" },
+    });
+
+    expect(engine.promptSession).toHaveBeenCalledWith(
+      "/tmp/desk.jsonl",
+      "[attached_audio: /tmp/upload.wav]\nhear audio",
+      {
+        audios: [{ type: "audio", data: "BASE64", mimeType: "audio/wav" }],
+        audioAttachmentPaths: ["/tmp/upload.wav"],
+      },
+    );
+  });
+
+  it("keeps display-only audio attachments on the legacy text path", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-display-audio-"));
+    try {
+      const filePath = path.join(tmpDir, "voice.wav");
+      fs.writeFileSync(filePath, Buffer.from([0x52, 0x49, 0x46, 0x46]));
+      const session = makeFakeSession();
+      const sessionPath = path.join(tmpDir, "main.jsonl");
+      fs.writeFileSync(sessionPath, "{}\n");
+      const registerSessionFile = vi.fn(({ sessionPath, filePath, label, origin, storageKind }) => ({
+        id: "sf_audio_attachment",
+        fileId: "sf_audio_attachment",
+        sessionPath,
+        filePath,
+        realPath: filePath,
+        displayName: label,
+        filename: path.basename(filePath),
+        label,
+        ext: "wav",
+        mime: "audio/wav",
+        size: 4,
+        kind: "audio",
+        origin,
+        storageKind,
+        createdAt: 1,
+      }));
+      const engine = {
+        hanakoHome: tmpDir,
+        registerSessionFile,
+        ensureSessionLoaded: vi.fn(async () => session),
+        promptSession: vi.fn(async (sessionPath, text, opts) => session.prompt(text, opts)),
+        emitEvent: vi.fn(),
+        setUiContext: vi.fn(),
+      };
+
+      await submitDesktopSessionMessage(engine, {
+        sessionPath,
+        text: `[附件] ${filePath}`,
+        displayMessage: {
+          text: "",
+          attachments: [{
+            path: filePath,
+            name: "voice.wav",
+            isDir: false,
+            mimeType: "audio/wav",
+          }],
+        },
+      });
+
+      expect(engine.promptSession).toHaveBeenCalledWith(
+        sessionPath,
+        `[附件] ${filePath}`,
+        undefined,
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("registers desktop display attachments into the session file ledger", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "hana-display-attachment-"));
     try {

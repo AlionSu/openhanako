@@ -1910,6 +1910,141 @@ describe("SessionCoordinator", () => {
     expect(sessionPrompt).not.toHaveBeenCalled();
   });
 
+  it("blocks audio prompts unless the model explicitly declares direct audio input", async () => {
+    const sessionFile = path.join(tempDir, "text-only-audio.jsonl");
+    const sessionPrompt = vi.fn();
+    const textOnlyModel = { id: "deepseek-v4-pro", provider: "deepseek", input: ["text"] };
+    const agent = {
+      id: "hana",
+      agentDir: tempDir,
+      sessionDir: tempDir,
+      sessionMemoryEnabled: true,
+      memoryMasterEnabled: true,
+      config: { locale: "zh-CN" },
+      setMemoryEnabled: vi.fn(),
+      buildSystemPrompt: () => "BASE",
+      tools: [],
+    };
+    createAgentSessionMock.mockResolvedValueOnce({
+      session: {
+        sessionManager: { getSessionFile: () => sessionFile },
+        subscribe: vi.fn(() => vi.fn()),
+        setActiveToolsByName: vi.fn(),
+        prompt: sessionPrompt,
+        model: textOnlyModel,
+      },
+    });
+
+    const coordinator = new SessionCoordinator({
+      agentsDir: tempDir,
+      getAgent: () => agent,
+      getActiveAgentId: () => "hana",
+      getModels: () => ({
+        currentModel: textOnlyModel,
+        authStorage: {},
+        modelRegistry: {},
+        resolveThinkingLevel: () => "medium",
+      }),
+      getResourceLoader: () => ({
+        getSystemPrompt: () => "BASE",
+        getAppendSystemPrompt: () => [],
+        getExtensions: () => ({ extensions: [], errors: [] }),
+      }),
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: () => {},
+      getHomeCwd: () => tempDir,
+      agentIdFromSessionPath: () => "hana",
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => ({ getThinkingLevel: () => "medium" }),
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => agent,
+      listAgents: () => [],
+    });
+
+    await coordinator.createSession(null, tempDir, true);
+
+    await expect(coordinator.prompt("听一下", {
+      audios: [{ type: "audio", data: "abc", mimeType: "audio/wav" }],
+    })).rejects.toThrow(/current model does not support audio input/);
+    expect(sessionPrompt).not.toHaveBeenCalled();
+  });
+
+  it("forwards direct audio prompts through the existing Pi SDK media option", async () => {
+    const sessionFile = path.join(tempDir, "mimo-audio.jsonl");
+    const sessionPrompt = vi.fn();
+    const mimoAudioModel = {
+      id: "mimo-v2.5",
+      provider: "mimo",
+      api: "openai-completions",
+      baseUrl: "https://api.xiaomimimo.com/v1",
+      input: ["text", "audio"],
+    };
+    const agent = {
+      id: "hana",
+      agentDir: tempDir,
+      sessionDir: tempDir,
+      sessionMemoryEnabled: true,
+      memoryMasterEnabled: true,
+      config: { locale: "zh-CN" },
+      setMemoryEnabled: vi.fn(),
+      buildSystemPrompt: () => "BASE",
+      tools: [],
+    };
+    createAgentSessionMock.mockResolvedValueOnce({
+      session: {
+        sessionManager: { getSessionFile: () => sessionFile },
+        subscribe: vi.fn(() => vi.fn()),
+        setActiveToolsByName: vi.fn(),
+        prompt: sessionPrompt,
+        model: mimoAudioModel,
+      },
+    });
+
+    const coordinator = new SessionCoordinator({
+      agentsDir: tempDir,
+      getAgent: () => agent,
+      getActiveAgentId: () => "hana",
+      getModels: () => ({
+        currentModel: mimoAudioModel,
+        authStorage: {},
+        modelRegistry: {},
+        resolveThinkingLevel: () => "medium",
+      }),
+      getResourceLoader: () => ({
+        getSystemPrompt: () => "BASE",
+        getAppendSystemPrompt: () => [],
+        getExtensions: () => ({ extensions: [], errors: [] }),
+      }),
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: () => {},
+      getHomeCwd: () => tempDir,
+      agentIdFromSessionPath: () => "hana",
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => ({ getThinkingLevel: () => "medium" }),
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => agent,
+      listAgents: () => [],
+    });
+
+    await coordinator.createSession(null, tempDir, true);
+
+    await coordinator.prompt("听一下", {
+      audios: [{ type: "audio", data: "abc", mimeType: "audio/wav" }],
+      audioAttachmentPaths: ["/tmp/voice.wav"],
+    });
+
+    expect(sessionPrompt).toHaveBeenCalledWith("听一下", {
+      images: [{ type: "audio", data: "abc", mimeType: "audio/wav" }],
+      audioAttachmentPaths: ["/tmp/voice.wav"],
+    });
+  });
+
   it("fresh session freezes the effective memory state into meta for cache safety", async () => {
     const sessionFile = path.join(tempDir, "frozen-memory.jsonl");
     let sessionMemoryEnabled = true;

@@ -26,8 +26,9 @@ import { AppError } from "../../shared/errors.js";
 import { errorBus } from "../../shared/error-bus.js";
 import { createRequestContext } from "../http/boundary.js";
 import { waitTimingDetails } from "../../lib/tools/wait-contract.js";
-import { MAX_CHAT_IMAGE_BASE64_CHARS, isAllowedChatImageMime, isChatImageBase64WithinLimit } from "../../shared/image-mime.js";
+import { isAllowedChatImageMime, isChatImageBase64WithinLimit } from "../../shared/image-mime.js";
 import { isAllowedChatVideoMime, isChatVideoBase64WithinLimit } from "../../shared/video-mime.js";
+import { isAllowedChatAudioMime, isChatAudioBase64WithinLimit } from "../../shared/audio-mime.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -1062,7 +1063,7 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
               return;
             }
 
-            if (msg.type === "prompt" && (msg.text || msg.images?.length || msg.videos?.length)) {
+            if (msg.type === "prompt" && (msg.text || msg.images?.length || msg.videos?.length || msg.audios?.length)) {
               // 图片校验：最多 10 张，单张 ≤ 20MB，仅允许常见图片 MIME
               if (msg.images?.length) {
                 const MAX_IMAGES = 10;
@@ -1098,7 +1099,24 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
                   }
                 }
               }
-              // 图片持久化 + [attached_image] 标记 + image 模态 check 统一在 hub.send() 和下游 handler 处理
+              if (msg.audios?.length) {
+                const MAX_AUDIOS = 3;
+                if (msg.audios.length > MAX_AUDIOS) {
+                  wsSend(ws, { type: "error", message: t("error.maxAudios", { max: MAX_AUDIOS }), sessionPath: msg.sessionPath });
+                  return;
+                }
+                for (const audio of msg.audios) {
+                  if (!audio?.mimeType || !isAllowedChatAudioMime(audio.mimeType)) {
+                    wsSend(ws, { type: "error", message: t("error.unsupportedAudioFormat", { mime: audio?.mimeType || "unknown" }), sessionPath: msg.sessionPath });
+                    return;
+                  }
+                  if (audio.data && !isChatAudioBase64WithinLimit(audio.data)) {
+                    wsSend(ws, { type: "error", message: t("error.audioTooLarge"), sessionPath: msg.sessionPath });
+                    return;
+                  }
+                }
+              }
+              // 媒体持久化 + attached_* 标记 + 模态 check 统一在 hub.send() 和下游 handler 处理
               let promptText = msg.text || "";
               // Skill invocation tags
               if (msg.skills?.length) {
@@ -1108,8 +1126,9 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
               if (!promptText.trim()) {
                 if (msg.images?.length) promptText = t("error.viewImage");
                 else if (msg.videos?.length) promptText = t("error.viewVideo");
+                else if (msg.audios?.length) promptText = t("error.listenAudio");
               }
-              debugLog()?.log("ws", `user message (${promptText.length} chars, ${msg.images?.length || 0} images, ${msg.videos?.length || 0} videos)`);
+              debugLog()?.log("ws", `user message (${promptText.length} chars, ${msg.images?.length || 0} images, ${msg.videos?.length || 0} videos, ${msg.audios?.length || 0} audios)`);
               // Phase 2: 客户端可指定 sessionPath，否则用焦点 session
               const promptSessionPath = requireSessionPath(msg, ws); if (!promptSessionPath) return;
               if (isDeletedAgentSessionPath(promptSessionPath)) {
@@ -1130,6 +1149,7 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
                   sessionPath: promptSessionPath,
                   images: msg.images,
                   videos: msg.videos,
+                  audios: msg.audios,
                   uiContext: msg.uiContext ?? null,
                   displayMessage: msg.displayMessage,
                 });

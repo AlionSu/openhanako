@@ -23,7 +23,12 @@ import { uniqueToolNames } from "../shared/tool-categories.js";
 import { collectMediaItems } from "../lib/tools/media-details.js";
 import { formatSettingsUpdateText } from "../lib/tools/settings-update-result.js";
 import { materializeBridgeInboundFiles } from "../lib/session-files/bridge-inbound-files.js";
-import { modelSupportsDirectVideoInput, modelSupportsVideoInput } from "../shared/model-capabilities.js";
+import {
+  modelSupportsDirectAudioInput,
+  modelSupportsAudioInput,
+  modelSupportsDirectVideoInput,
+  modelSupportsVideoInput,
+} from "../shared/model-capabilities.js";
 import {
   appendBridgePromptLine,
   bridgeContextIndexMeta,
@@ -52,16 +57,28 @@ function assertVideoInputSupported(model, videos) {
   }
 }
 
+function assertAudioInputSupported(model, audios) {
+  if (!audios?.length) return;
+  if (!modelSupportsAudioInput(model)) {
+    throw new Error("current model does not support audio input");
+  }
+  if (!modelSupportsDirectAudioInput(model)) {
+    throw new Error("current provider does not support direct audio input");
+  }
+}
+
 function buildPromptMediaOptions(opts) {
   const media = [
     ...(opts?.images || []),
     ...(opts?.videos || []),
+    ...(opts?.audios || []),
   ];
   if (!media.length) return undefined;
   return {
     images: media,
     ...(opts.imageAttachmentPaths?.length ? { imageAttachmentPaths: opts.imageAttachmentPaths } : {}),
     ...(opts.videoAttachmentPaths?.length ? { videoAttachmentPaths: opts.videoAttachmentPaths } : {}),
+    ...(opts.audioAttachmentPaths?.length ? { audioAttachmentPaths: opts.audioAttachmentPaths } : {}),
   };
 }
 
@@ -891,6 +908,7 @@ export class BridgeSessionManager {
           this._prePromptAbortControllers.delete(sessionKey);
         }
         assertVideoInputSupported(session.model, opts?.videos);
+        assertAudioInputSupported(session.model, opts?.audios);
         const promptOpts = buildPromptMediaOptions(opts);
         await session.prompt(promptText, promptOpts);
       } finally {

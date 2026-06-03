@@ -242,6 +242,90 @@ describe('InputArea media send', () => {
     expect(mocks.hanaFetch.mock.calls.some(([path]) => path === '/api/preferences/models')).toBe(false);
   });
 
+  it('sends audio bytes natively for official MiMo audio models', async () => {
+    useStore.setState({
+      attachedFiles: [{
+        fileId: 'sf_voice',
+        path: '/tmp/hana/session-files/voice.wav',
+        name: 'voice.wav',
+        isDirectory: false,
+      }],
+      attachedFilesBySession: {
+        '/session/media.jsonl': [{
+          fileId: 'sf_voice',
+          path: '/tmp/hana/session-files/voice.wav',
+          name: 'voice.wav',
+          isDirectory: false,
+        }],
+      },
+      models: [{
+        id: 'mimo-v2.5',
+        provider: 'mimo',
+        name: 'MiMo V2.5',
+        api: 'openai-completions',
+        baseUrl: 'https://api.xiaomimimo.com/v1',
+        input: ['text', 'audio'],
+        isCurrent: true,
+      }],
+    } as never);
+    window.platform = {
+      readFileBase64: vi.fn(async () => 'AUDIO_BASE64'),
+    } as unknown as typeof window.platform;
+
+    render(React.createElement(InputArea));
+
+    fireEvent.click(screen.getByTestId('send'));
+
+    await waitFor(() => {
+      expect(mocks.wsSend).toHaveBeenCalledTimes(1);
+    });
+    const payload = JSON.parse(String(mocks.wsSend.mock.calls[0][0]));
+    expect(window.platform.readFileBase64).toHaveBeenCalledWith('/tmp/hana/session-files/voice.wav');
+    expect(payload.text).toBe('');
+    expect(payload.audios).toEqual([{
+      type: 'audio',
+      data: 'AUDIO_BASE64',
+      mimeType: 'audio/wav',
+    }]);
+    expect(payload.displayMessage.attachments[0]).toMatchObject({
+      fileId: 'sf_voice',
+      path: '/tmp/hana/session-files/voice.wav',
+      name: 'voice.wav',
+      mimeType: 'audio/wav',
+    });
+  });
+
+  it('keeps audio attachments on the legacy text path for unsupported models', async () => {
+    useStore.setState({
+      attachedFiles: [{
+        fileId: 'sf_voice',
+        path: '/tmp/hana/session-files/voice.wav',
+        name: 'voice.wav',
+        isDirectory: false,
+      }],
+      attachedFilesBySession: {
+        '/session/media.jsonl': [{
+          fileId: 'sf_voice',
+          path: '/tmp/hana/session-files/voice.wav',
+          name: 'voice.wav',
+          isDirectory: false,
+        }],
+      },
+    } as never);
+
+    render(React.createElement(InputArea));
+
+    fireEvent.click(screen.getByTestId('send'));
+
+    await waitFor(() => {
+      expect(mocks.wsSend).toHaveBeenCalledTimes(1);
+    });
+    const payload = JSON.parse(String(mocks.wsSend.mock.calls[0][0]));
+    expect(payload.audios).toBeUndefined();
+    expect(payload.text).toBe('[附件] /tmp/hana/session-files/voice.wav');
+    expect(window.platform.readFileBase64).not.toHaveBeenCalled();
+  });
+
   it('does not send while an agent switch session is still pending', async () => {
     useStore.setState({ pendingSessionSwitchPath: '/session/new-agent.jsonl' } as never);
 

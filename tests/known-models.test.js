@@ -153,6 +153,7 @@ describe("known-models dictionary", () => {
       maxOutput: 131072,
       image: true,
       video: true,
+      audio: true,
       reasoning: true,
     });
 
@@ -184,6 +185,7 @@ describe("known-models dictionary", () => {
       maxOutput: 131072,
       image: true,
       video: true,
+      audio: true,
       reasoning: true,
     });
   });

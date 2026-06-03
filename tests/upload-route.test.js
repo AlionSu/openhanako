@@ -211,6 +211,63 @@ describe("upload route", () => {
     });
   });
 
+  it("upload-blob stores session-owned recorded audio under session file cache", async () => {
+    tmpDir = mktemp();
+    const hanakoHome = path.join(tmpDir, "hana-home");
+    const sessionPath = "/sessions/audio-blob.jsonl";
+    const audioBytes = Buffer.from("webm audio bytes");
+    const registerSessionFile = vi.fn(({ sessionPath, filePath, label, origin, storageKind }) => ({
+      id: "sf_audio",
+      sessionPath,
+      filePath,
+      realPath: filePath,
+      displayName: label,
+      filename: path.basename(filePath),
+      label,
+      ext: "weba",
+      mime: "audio/webm",
+      size: audioBytes.length,
+      kind: "audio",
+      origin,
+      storageKind,
+      createdAt: 1,
+    }));
+    const app = new Hono();
+    app.route("/api", createUploadRoute({ hanakoHome, registerSessionFile }));
+
+    const res = await app.request("/api/upload-blob", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionPath,
+        name: "recording.webm",
+        base64Data: audioBytes.toString("base64"),
+        mimeType: "audio/webm",
+      }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.uploads[0].error).toBeUndefined();
+    expect(data.uploads[0].name).toBe("recording.weba");
+    expect(data.uploads[0].dest.startsWith(path.join(hanakoHome, "session-files"))).toBe(true);
+    expect(fs.readFileSync(data.uploads[0].dest).equals(audioBytes)).toBe(true);
+    expect(registerSessionFile).toHaveBeenCalledWith({
+      sessionPath,
+      filePath: data.uploads[0].dest,
+      label: "recording.weba",
+      origin: "user_upload",
+      storageKind: "managed_cache",
+    });
+    expect(data.uploads[0]).toMatchObject({
+      fileId: "sf_audio",
+      sessionPath,
+      mime: "audio/webm",
+      kind: "audio",
+      storageKind: "managed_cache",
+    });
+  });
+
   it("upload-blob rejects non-image mimeType", async () => {
     tmpDir = mktemp();
     const app = new Hono();

@@ -46,6 +46,7 @@ describe("MiMo known model capabilities", () => {
       input: ["text", "image"],
       compat: {
         hanaVideoInput: true,
+        hanaAudioInput: true,
       },
     });
   });

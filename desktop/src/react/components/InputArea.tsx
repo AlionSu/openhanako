@@ -12,10 +12,11 @@ import { useStore } from '../stores';
 import { selectPreviewItems, selectActiveTabId } from '../stores/preview-slice';
 import { selectSessionFiles } from '../stores/selectors/file-refs';
 import { isImageFile, isVideoFile } from '../utils/format';
+import { isAudioFileName } from '../utils/file-kind';
 import { fetchConfig } from '../hooks/use-config';
 import { useI18n } from '../hooks/use-i18n';
 import { continueDeletedAgentSession, ensureSession, loadSessions } from '../stores/session-actions';
-import { revealDeskDirectory, searchDeskFiles, toggleJianSidebar } from '../stores/desk-actions';
+import { revealDeskDirectory, toggleJianSidebar } from '../stores/desk-actions';
 import { getWebSocket } from '../services/websocket';
 import { collectUiContext } from '../utils/ui-context';
 import { formatQuotedSelectionForPrompt } from '../utils/quoted-selection';
@@ -39,7 +40,9 @@ import { extractPlainUrlPaste } from '../utils/plain-url-paste';
 import { createInputEditorExtensions } from './input/input-editor-extensions';
 import {
   evaluateChatImageSendPreflight,
+  evaluateChatAudioSendPreflight,
   evaluateChatVideoSendPreflight,
+  getModelAudioInputMode,
   notifyTextModelImageBlocked,
   notifyTextModelVideoBlocked,
 } from '../utils/chat-image-send-preflight';
@@ -55,7 +58,7 @@ import {
 import { attachFilesFromPaths } from '../MainContent';
 import { hanaFetch } from '../hooks/use-hana-fetch';
 import styles from './input/InputArea.module.css';
-import type { DeskSearchResult, TodoItem } from '../types';
+import type { TodoItem } from '../types';
 import type { ChatListItem, SessionConfirmationBlock } from '../stores/chat-types';
 
 const EMPTY_TODOS: TodoItem[] = [];
@@ -89,7 +92,26 @@ function chatImageMimeTypeForName(name: string, fallback?: string): string {
   return mimeMap[ext] || 'image/png';
 }
 
+function chatAudioMimeTypeForName(name: string, fallback?: string): string {
+  if (fallback?.startsWith('audio/')) return fallback;
+  const ext = name.toLowerCase().replace(/^.*\./, '');
+  const mimeMap: Record<string, string> = {
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    flac: 'audio/flac',
+    m4a: 'audio/mp4',
+    weba: 'audio/webm',
+    webm: 'audio/webm',
+  };
+  return mimeMap[ext] || 'audio/wav';
+}
+
 async function readFileAsBase64(file: File): Promise<string> {
+  return readBlobAsBase64(file);
+}
+
+async function readBlobAsBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error || new Error('file read failed'));
@@ -98,8 +120,82 @@ async function readFileAsBase64(file: File): Promise<string> {
       const comma = value.indexOf(',');
       resolve(comma >= 0 ? value.slice(comma + 1) : value);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+function mergeFloat32Chunks(chunks: Float32Array[]): Float32Array {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const merged = new Float32Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return merged;
+}
+
+function writeAscii(view: DataView, offset: number, value: string): void {
+  for (let i = 0; i < value.length; i += 1) {
+    view.setUint8(offset + i, value.charCodeAt(i));
+  }
+}
+
+function encodeWavBlob(chunks: Float32Array[], sampleRate: number): Blob {
+  const samples = mergeFloat32Chunks(chunks);
+  const bytesPerSample = 2;
+  const dataSize = samples.length * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(view, 8, 'WAVE');
+  writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 8 * bytesPerSample, true);
+  writeAscii(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+    offset += bytesPerSample;
+  }
+  return new Blob([view], { type: 'audio/wav' });
+}
+
+function formatRecordingElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+interface AudioRecorderRuntime {
+  stream: MediaStream;
+  audioContext: AudioContext;
+  source: MediaStreamAudioSourceNode;
+  processor: ScriptProcessorNode;
+  silentGain: GainNode;
+  chunks: Float32Array[];
+  sampleRate: number;
+}
+
+function disposeAudioRecorderRuntime(runtime: AudioRecorderRuntime): void {
+  try { runtime.processor.disconnect(); } catch {}
+  try { runtime.source.disconnect(); } catch {}
+  try { runtime.silentGain.disconnect(); } catch {}
+  for (const track of runtime.stream.getTracks()) {
+    try { track.stop(); } catch {}
+  }
+  if (runtime.audioContext.state !== 'closed') {
+    void runtime.audioContext.close().catch(() => {});
+  }
 }
 
 interface FileMentionRange {
@@ -215,6 +311,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
   const currentModelInfo = sessionModel || globalModelInfo;
   // input 数组缺失视为未知；只有显式 text-only 的模型才在 UI 上标记“辅助视觉”。
   const supportsVision = !Array.isArray(currentModelInfo?.input) || currentModelInfo.input.includes("image");
+  const showAudioInput = getModelAudioInputMode(currentModelInfo) === 'native-audio';
   const showThinkingControl = useMemo(
     () => shouldShowThinkingControl(currentModelInfo, models),
     [currentModelInfo, models],
@@ -244,20 +341,25 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
   const slashBtnRef = useRef<HTMLButtonElement>(null);
   const browserFileInputRef = useRef<HTMLInputElement>(null);
   const slashDismissedTextRef = useRef<string | null>(null);
-  const fileMentionSearchSeqRef = useRef(0);
   const inputSurfaceRef = useRef<HTMLDivElement>(null);
   const inputCardRef = useRef<HTMLDivElement>(null);
   const focusFrameRef = useRef<number | null>(null);
+  const audioRecorderRef = useRef<AudioRecorderRuntime | null>(null);
+  const audioRecordingSeqRef = useRef(0);
   const [inputText, setInputText] = useState('');
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [fileSelected, setFileSelected] = useState(0);
   const [fileMentionRange, setFileMentionRange] = useState<FileMentionRange | null>(null);
   const [fileMentionQuery, setFileMentionQuery] = useState('');
-  const [fileMentionSearchResults, setFileMentionSearchResults] = useState<DeskSearchResult[]>([]);
-  const [fileMentionBusy, setFileMentionBusy] = useState(false);
+  const [fileMentionBusy] = useState(false);
   const [completingTodos, setCompletingTodos] = useState(false);
   const [continuingDeletedAgentSession, setContinuingDeletedAgentSession] = useState(false);
   const [deletedAgentContinueError, setDeletedAgentContinueError] = useState<string | null>(null);
+  const [audioRecorderOpen, setAudioRecorderOpen] = useState(false);
+  const [audioRecordingState, setAudioRecordingState] = useState<'idle' | 'starting' | 'recording' | 'stopping'>('idle');
+  const [audioRecordingStartedAt, setAudioRecordingStartedAt] = useState<number | null>(null);
+  const [audioRecordingElapsed, setAudioRecordingElapsed] = useState(0);
+  const [audioRecordingError, setAudioRecordingError] = useState<string | null>(null);
   const inputLocked = deletedAgentReadOnly || continuingDeletedAgentSession;
 
   useEffect(() => {
@@ -556,13 +658,12 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     deskFiles,
     deskBasePath,
     deskCurrentPath: '',
-    searchResults: fileMentionSearchResults,
+    searchResults: [],
   }), [
     attachedFiles,
     deskBasePath,
     deskFiles,
     fileMentionQuery,
-    fileMentionSearchResults,
     sessionFiles,
   ]);
 
@@ -576,39 +677,6 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     slashDismissedTextRef.current = null;
     setSlashMenuOpen(true);
   }, []);
-
-  useEffect(() => {
-    if (!fileMenuOpen) {
-      setFileMentionSearchResults([]);
-      setFileMentionBusy(false);
-      return;
-    }
-
-    const query = fileMentionQuery.trim();
-    const seq = ++fileMentionSearchSeqRef.current;
-    if (!query) {
-      setFileMentionSearchResults([]);
-      setFileMentionBusy(false);
-      return;
-    }
-
-    setFileMentionBusy(true);
-    const timer = window.setTimeout(() => {
-      searchDeskFiles(query)
-        .then((results) => {
-          if (fileMentionSearchSeqRef.current === seq) setFileMentionSearchResults(results);
-        })
-        .catch((err: unknown) => {
-          if (fileMentionSearchSeqRef.current === seq) setFileMentionSearchResults([]);
-          console.warn('[file-mention] search failed', err);
-        })
-        .finally(() => {
-          if (fileMentionSearchSeqRef.current === seq) setFileMentionBusy(false);
-        });
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [fileMentionQuery, fileMenuOpen]);
 
   useEffect(() => {
     if (fileSelected < fileMentionItems.length) return;
@@ -633,7 +701,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
 
       for (const file of files) {
         if (useStore.getState().attachedFiles.length >= 9) break;
-        const mimeType = file.type || chatImageMimeTypeForName(file.name);
+        const mimeType = file.type || (isAudioFileName(file.name) ? chatAudioMimeTypeForName(file.name) : chatImageMimeTypeForName(file.name));
         try {
           const base64Data = await readFileAsBase64(file);
           const res = await hanaFetch('/api/upload-blob', {
@@ -689,6 +757,206 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     browserFileInputRef.current?.click();
     window.setTimeout(restoreEditorFocus, 0);
   }, [inputLocked, restoreEditorFocus, surface]);
+
+  const insertRecordedAudioBadge = useCallback((file: {
+    fileId?: string;
+    path: string;
+    name: string;
+    mimeType: string;
+  }) => {
+    if (!editor) {
+      addAttachedFile({
+        fileId: file.fileId,
+        path: file.path,
+        name: file.name,
+        isDirectory: false,
+        mimeType: file.mimeType,
+      });
+      return;
+    }
+    editor.chain()
+      .focus()
+      .insertContent({
+        type: 'fileBadge',
+        attrs: {
+          fileId: file.fileId || null,
+          path: file.path,
+          name: file.name,
+          isDirectory: false,
+          mimeType: file.mimeType,
+        },
+      })
+      .insertContent(' ')
+      .run();
+  }, [addAttachedFile, editor]);
+
+  const stopAudioRecording = useCallback(async ({ discard = false }: { discard?: boolean } = {}) => {
+    const runtime = audioRecorderRef.current;
+    if (!runtime) {
+      setAudioRecordingState('idle');
+      setAudioRecordingStartedAt(null);
+      setAudioRecordingElapsed(0);
+      return;
+    }
+
+    audioRecorderRef.current = null;
+    setAudioRecordingState(discard ? 'idle' : 'stopping');
+    setAudioRecordingStartedAt(null);
+
+    const chunks = runtime.chunks.slice();
+    const sampleRate = runtime.sampleRate;
+    disposeAudioRecorderRuntime(runtime);
+
+    if (discard) {
+      setAudioRecordingElapsed(0);
+      return;
+    }
+
+    try {
+      if (chunks.length === 0) {
+        throw new Error('empty audio recording');
+      }
+      const blob = encodeWavBlob(chunks, sampleRate);
+      if (blob.size <= 44) {
+        throw new Error('empty audio recording');
+      }
+      const base64Data = await readBlobAsBase64(blob);
+      const index = audioRecordingSeqRef.current + 1;
+      audioRecordingSeqRef.current = index;
+      const name = t('input.recordedAudioName', { index });
+      const res = await hanaFetch('/api/upload-blob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          base64Data,
+          mimeType: 'audio/wav',
+          ...(useStore.getState().currentSessionPath ? { sessionPath: useStore.getState().currentSessionPath } : {}),
+        }),
+      });
+      const data = await res.json();
+      const upload = data?.uploads?.[0];
+      if (!upload?.dest) {
+        throw new Error(upload?.error || 'audio upload failed');
+      }
+      insertRecordedAudioBadge({
+        fileId: upload.fileId,
+        path: upload.dest,
+        name: upload.name || name,
+        mimeType: 'audio/wav',
+      });
+      setAudioRecorderOpen(false);
+      setAudioRecordingError(null);
+    } catch (err) {
+      const message = t('input.audioRecordingFailed');
+      setAudioRecordingError(message);
+      addToast(message, 'error', 6000);
+      console.warn('[input] failed to finalize audio recording', err);
+    } finally {
+      setAudioRecordingState('idle');
+      setAudioRecordingElapsed(0);
+      restoreEditorFocus();
+    }
+  }, [addToast, insertRecordedAudioBadge, restoreEditorFocus, t]);
+
+  const startAudioRecording = useCallback(async () => {
+    if (inputLocked || !showAudioInput) return;
+    if (audioRecordingState !== 'idle' || audioRecorderRef.current) return;
+    const AudioContextCtor = window.AudioContext
+      || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!navigator.mediaDevices?.getUserMedia || !AudioContextCtor) {
+      const message = t('input.audioRecordingUnavailable');
+      setAudioRecorderOpen(true);
+      setAudioRecordingError(message);
+      addToast(message, 'error', 6000);
+      return;
+    }
+
+    setAudioRecorderOpen(true);
+    setAudioRecordingError(null);
+    setAudioRecordingState('starting');
+
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      const audioContext = new AudioContextCtor();
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const silentGain = audioContext.createGain();
+      const chunks: Float32Array[] = [];
+      silentGain.gain.value = 0;
+      processor.onaudioprocess = (event) => {
+        if (!audioRecorderRef.current) return;
+        chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      };
+      source.connect(processor);
+      processor.connect(silentGain);
+      silentGain.connect(audioContext.destination);
+      audioRecorderRef.current = {
+        stream,
+        audioContext,
+        source,
+        processor,
+        silentGain,
+        chunks,
+        sampleRate: audioContext.sampleRate,
+      };
+      setAudioRecordingStartedAt(Date.now());
+      setAudioRecordingElapsed(0);
+      setAudioRecordingState('recording');
+    } catch (err) {
+      if (stream) {
+        for (const track of stream.getTracks()) {
+          try { track.stop(); } catch {}
+        }
+      }
+      const message = t('input.audioRecordingFailed');
+      setAudioRecordingState('idle');
+      setAudioRecordingStartedAt(null);
+      setAudioRecordingError(message);
+      addToast(message, 'error', 6000);
+      console.warn('[input] failed to start audio recording', err);
+    }
+  }, [addToast, audioRecordingState, inputLocked, showAudioInput, t]);
+
+  const handleAudioRecordToggle = useCallback(() => {
+    if (audioRecordingState === 'recording') {
+      void stopAudioRecording();
+      return;
+    }
+    if (audioRecordingState === 'idle') {
+      void startAudioRecording();
+    }
+  }, [audioRecordingState, startAudioRecording, stopAudioRecording]);
+
+  useEffect(() => {
+    if (audioRecordingState !== 'recording' || !audioRecordingStartedAt) return undefined;
+    const updateElapsed = () => setAudioRecordingElapsed(Date.now() - audioRecordingStartedAt);
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 250);
+    return () => window.clearInterval(timer);
+  }, [audioRecordingStartedAt, audioRecordingState]);
+
+  useEffect(() => {
+    if (showAudioInput || audioRecordingState === 'idle') return undefined;
+    void stopAudioRecording({ discard: true });
+    setAudioRecorderOpen(false);
+    return undefined;
+  }, [audioRecordingState, showAudioInput, stopAudioRecording]);
+
+  useEffect(() => {
+    return () => {
+      const runtime = audioRecorderRef.current;
+      if (!runtime) return;
+      audioRecorderRef.current = null;
+      disposeAudioRecorderRuntime(runtime);
+    };
+  }, []);
 
   // Sync editor text to React state (drives hasInput / canSend) + slash menu detection + draft save
   useEffect(() => {
@@ -954,10 +1222,10 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
         loadSessions();
       }
 
-      // 分离原生媒体和普通附件；后端决定图片视觉桥、视频原生能力或显式报错。
+      // 分离原生媒体和普通附件；后端决定图片视觉桥、视频/音频原生能力或显式报错。
       const imageFiles = hasFiles ? inputFiles.filter(f => !f.isDirectory && isImageFile(f.name)) : [];
       const videoFiles = hasFiles ? inputFiles.filter(f => !f.isDirectory && isVideoFile(f.name)) : [];
-      const otherFiles = hasFiles ? inputFiles.filter(f => f.isDirectory || (!isImageFile(f.name) && !isVideoFile(f.name))) : [];
+      const audioFiles = hasFiles ? inputFiles.filter(f => !f.isDirectory && isAudioFileName(f.name, f.mimeType)) : [];
 
       const imagePreflight = await evaluateChatImageSendPreflight({
         attachments: inputFiles,
@@ -984,6 +1252,18 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
         });
         return;
       }
+      const audioPreflight = await evaluateChatAudioSendPreflight({
+        attachments: inputFiles,
+        model: currentModelInfo,
+      });
+      const sendAudiosNatively = audioPreflight.ok && audioPreflight.reason === 'native-audio';
+      const otherFiles = hasFiles ? inputFiles.filter(f =>
+        f.isDirectory || (
+          !isImageFile(f.name)
+          && !isVideoFile(f.name)
+          && !(sendAudiosNatively && isAudioFileName(f.name, f.mimeType))
+        )
+      ) : [];
 
       let finalText = text;
       if (otherFiles.length > 0) {
@@ -996,8 +1276,10 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
       const platform = window.platform;
       const images: Array<{ type: 'image'; data: string; mimeType: string }> = [];
       const videos: Array<{ type: 'video'; data: string; mimeType: string }> = [];
+      const audios: Array<{ type: 'audio'; data: string; mimeType: string }> = [];
       const imageBase64Map = new Map<string, { base64Data: string; mimeType: string }>();
       const videoBase64Map = new Map<string, { base64Data: string; mimeType: string }>();
+      const audioBase64Map = new Map<string, { base64Data: string; mimeType: string }>();
       for (const img of imageFiles) {
         try {
           if (img.base64Data && img.mimeType) {
@@ -1016,6 +1298,29 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
           console.warn('[input] failed to read image attachment', err);
           useStore.getState().addToast(t('input.imageReadFailed'), 'error', 6000, {
             dedupeKey: `image-read-failed:${img.path}`,
+          });
+          return;
+        }
+      }
+      for (const audio of sendAudiosNatively ? audioFiles : []) {
+        try {
+          if (audio.base64Data) {
+            const mimeType = chatAudioMimeTypeForName(audio.name, audio.mimeType);
+            audios.push({ type: 'audio', data: audio.base64Data, mimeType });
+          } else {
+            const base64 = await platform?.readFileBase64?.(audio.path);
+            if (base64) {
+              const mimeType = chatAudioMimeTypeForName(audio.name, audio.mimeType);
+              audioBase64Map.set(audio.path, { base64Data: base64, mimeType });
+              audios.push({ type: 'audio', data: base64, mimeType });
+            } else {
+              throw new Error(`failed to read audio attachment: ${audio.path}`);
+            }
+          }
+        } catch (err) {
+          console.warn('[input] failed to read audio attachment', err);
+          useStore.getState().addToast(t('input.audioReadFailed'), 'error', 6000, {
+            dedupeKey: `audio-read-failed:${audio.path}`,
           });
           return;
         }
@@ -1080,13 +1385,14 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
           attachments: allFiles.length > 0 ? allFiles.map(f => {
             const cached = imageBase64Map.get(f.path);
             const cachedVideo = videoBase64Map.get(f.path);
+            const cachedAudio = audioBase64Map.get(f.path);
             const imageFile = !f.isDirectory && isImageFile(f.name);
             return {
               fileId: f.fileId,
               path: f.path,
               name: f.name,
               isDir: !!f.isDirectory,
-              mimeType: f.mimeType || cached?.mimeType || cachedVideo?.mimeType || undefined,
+              mimeType: f.mimeType || cached?.mimeType || cachedVideo?.mimeType || cachedAudio?.mimeType || undefined,
               visionAuxiliary: imageFile && !supportsVision,
             };
           }) : undefined,
@@ -1094,6 +1400,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
       };
       if (images.length > 0) wsMsg.images = images;
       if (videos.length > 0) wsMsg.videos = videos;
+      if (audios.length > 0) wsMsg.audios = audios;
       if (skills.length > 0) wsMsg.skills = skills;
       ws?.send(JSON.stringify(wsMsg));
     } finally {
@@ -1312,7 +1619,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
             className={styles['browser-file-input']}
             type="file"
             multiple
-            accept="image/png,image/jpeg,image/gif,image/webp"
+            accept="image/png,image/jpeg,image/gif,image/webp,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/flac,audio/webm"
             disabled={inputLocked}
             onChange={handleBrowserFileInputChange}
           />
@@ -1342,10 +1649,36 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
             isStreaming={isStreaming}
             hasInput={!!inputText.trim()}
             canSend={canSend}
+            showAudioInput={showAudioInput}
+            audioRecordingActive={audioRecordingState === 'recording'}
+            audioRecordingBusy={audioRecordingState === 'starting' || audioRecordingState === 'stopping'}
+            onAudioToggle={handleAudioRecordToggle}
             onSend={handleSend}
             onSteer={handleSteer}
             onStop={handleStop}
           />
+          {audioRecorderOpen && showAudioInput && (
+            <div className={styles['audio-recording-card']} role="status" aria-live="polite">
+              <div className={`${styles['audio-recording-dot']}${audioRecordingState === 'recording' ? ` ${styles['is-live']}` : ''}`} />
+              <div className={styles['audio-recording-copy']}>
+                <div className={styles['audio-recording-title']}>
+                  {audioRecordingState === 'starting'
+                    ? t('input.audioRecordingStarting')
+                    : audioRecordingState === 'stopping'
+                      ? t('input.audioRecordingSaving')
+                      : t('input.audioRecording')}
+                </div>
+                <div className={styles['audio-recording-time']}>
+                  {formatRecordingElapsed(audioRecordingElapsed)}
+                </div>
+                {audioRecordingError && (
+                  <div className={styles['audio-recording-error']}>
+                    {audioRecordingError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {deletedAgentReadOnly && (
             <div className={styles['deleted-agent-overlay']} role="status" aria-live="polite">
               <div className={styles['deleted-agent-panel']}>

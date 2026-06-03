@@ -12,6 +12,8 @@
  * @param {string[]} [opts.imageAttachmentPaths]
  * @param {Array<{type:'video', data:string, mimeType:string}>} [opts.videos]
  * @param {string[]} [opts.videoAttachmentPaths]
+ * @param {Array<{type:'audio', data:string, mimeType:string}>} [opts.audios]
+ * @param {string[]} [opts.audioAttachmentPaths]
  * @param {Array<{type:string, filename?:string, mimeType?:string, buffer:Buffer|Uint8Array|string}>} [opts.inboundFiles]
  * @param {(delta: string, accumulated: string) => void} [opts.onDelta]
  * @param {object} [opts.displayMessage]
@@ -35,6 +37,8 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
     imageAttachmentPaths,
     videos,
     videoAttachmentPaths,
+    audios,
+    audioAttachmentPaths,
     inboundFiles,
     onDelta,
     displayMessage,
@@ -45,7 +49,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
     throw new Error("desktop-session-submit: engine session API unavailable");
   }
   if (!sessionPath) throw new Error("desktop-session-submit: sessionPath is required");
-  if (!text && !images?.length && !videos?.length) throw new Error("desktop-session-submit: text, images, or videos required");
+  if (!text && !images?.length && !videos?.length && !audios?.length) throw new Error("desktop-session-submit: text, images, videos, or audios required");
   if (pendingDesktopSessionSubmissions.has(sessionPath)) {
     throw new Error("session_busy");
   }
@@ -64,6 +68,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
 
     let promptImageAttachmentPaths = imageAttachmentPaths || [];
     let promptVideoAttachmentPaths = videoAttachmentPaths || [];
+    let promptAudioAttachmentPaths = audioAttachmentPaths || [];
     let displayAttachments = displayMessage?.attachments;
     let promptText = text || "";
 
@@ -83,6 +88,12 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
         ...promptVideoAttachmentPaths,
         ...registeredDisplay.videoAttachmentPaths,
       ]);
+      if (audios?.length || promptAudioAttachmentPaths.length) {
+        promptAudioAttachmentPaths = uniquePaths([
+          ...promptAudioAttachmentPaths,
+          ...registeredDisplay.audioAttachmentPaths,
+        ]);
+      }
     }
 
     if (inboundFiles?.length) {
@@ -120,6 +131,7 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
 
     promptText = addAttachedImageMarkers(promptText, promptImageAttachmentPaths);
     promptText = addAttachedVideoMarkers(promptText, promptVideoAttachmentPaths);
+    promptText = addAttachedAudioMarkers(promptText, promptAudioAttachmentPaths);
 
     let captured = "";
     const toolMedia = [];
@@ -145,12 +157,14 @@ export async function submitDesktopSessionMessage(engine, opts = {}) {
     });
 
     try {
-      const promptOpts = images?.length || videos?.length
+      const promptOpts = images?.length || videos?.length || audios?.length
         ? {
           ...(images?.length ? { images } : {}),
           ...(videos?.length ? { videos } : {}),
+          ...(audios?.length ? { audios } : {}),
           ...(promptImageAttachmentPaths.length ? { imageAttachmentPaths: promptImageAttachmentPaths } : {}),
           ...(promptVideoAttachmentPaths.length ? { videoAttachmentPaths: promptVideoAttachmentPaths } : {}),
+          ...(promptAudioAttachmentPaths.length ? { audioAttachmentPaths: promptAudioAttachmentPaths } : {}),
         }
         : undefined;
       await engine.promptSession(sessionPath, promptText, promptOpts);
@@ -172,6 +186,7 @@ function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, regi
   const nextAttachments = [];
   const imageAttachmentPaths = [];
   const videoAttachmentPaths = [];
+  const audioAttachmentPaths = [];
 
   for (const attachment of attachments || []) {
     let next = { ...attachment };
@@ -212,6 +227,8 @@ function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, regi
       imageAttachmentPaths.push(next.path);
     } else if (!next.isDir && next.path && kind === "video") {
       videoAttachmentPaths.push(next.path);
+    } else if (!next.isDir && next.path && kind === "audio") {
+      audioAttachmentPaths.push(next.path);
     }
     nextAttachments.push(next);
   }
@@ -220,6 +237,7 @@ function registerDisplayAttachments({ hanakoHome, sessionPath, attachments, regi
     attachments: nextAttachments,
     imageAttachmentPaths: uniquePaths(imageAttachmentPaths),
     videoAttachmentPaths: uniquePaths(videoAttachmentPaths),
+    audioAttachmentPaths: uniquePaths(audioAttachmentPaths),
   };
 }
 
@@ -249,6 +267,15 @@ function addAttachedVideoMarkers(text, videoAttachmentPaths) {
     .filter((filePath) => filePath && !promptText.includes(`[attached_video: ${filePath}]`));
   if (!missing.length) return promptText;
   const markerText = missing.map((filePath) => `[attached_video: ${filePath}]`).join("\n");
+  return promptText ? `${markerText}\n${promptText}` : markerText;
+}
+
+function addAttachedAudioMarkers(text, audioAttachmentPaths) {
+  let promptText = text || "";
+  const missing = uniquePaths(audioAttachmentPaths)
+    .filter((filePath) => filePath && !promptText.includes(`[attached_audio: ${filePath}]`));
+  if (!missing.length) return promptText;
+  const markerText = missing.map((filePath) => `[attached_audio: ${filePath}]`).join("\n");
   return promptText ? `${markerText}\n${promptText}` : markerText;
 }
 

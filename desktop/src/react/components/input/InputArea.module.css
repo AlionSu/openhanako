@@ -137,6 +137,7 @@
 }
 
 .input-surface-mobile .attach-btn,
+.input-surface-mobile .audio-record-btn,
 .input-surface-mobile .thinking-pill,
 .input-surface-mobile .plan-mode-btn,
 .input-surface-mobile .send-btn {
@@ -155,6 +156,41 @@
 
 .input-surface-mobile .send-label {
     gap: 0;
+}
+
+.audio-record-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0;
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.06);
+    border: 1px solid rgba(var(--accent-rgb), 0.26);
+    border-radius: var(--radius-sm);
+    cursor: default;
+    transition: all var(--duration-slow) var(--ease-out);
+    -webkit-app-region: no-drag;
+}
+
+.audio-record-btn:hover:not(:disabled) {
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.1);
+    border-color: rgba(var(--accent-rgb), 0.36);
+}
+
+.audio-record-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.audio-record-btn.is-recording {
+    color: var(--coral);
+    background: color-mix(in srgb, var(--coral) 9%, var(--bg-card));
+    border-color: color-mix(in srgb, var(--coral) 36%, transparent);
 }
 
 /* ── Context Usage Ring ── */
@@ -829,6 +865,17 @@
     justify-content: center;
     flex-shrink: 0;
     color: var(--text-muted);
+    width: 22px;
+    height: 22px;
+}
+
+.file-mention-thumbnail {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    object-fit: cover;
+    background: rgba(var(--accent-rgb), 0.08);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.08);
 }
 
 .file-mention-main {
@@ -844,6 +891,7 @@
     white-space: nowrap;
     font-size: 0.84rem;
     font-weight: 500;
+    color: var(--accent);
 }
 
 .file-mention-detail {
@@ -1214,6 +1262,84 @@
     border-radius: min(var(--radius-lg), 14px);
 }
 
+.audio-recording-card {
+    position: absolute;
+    right: var(--space-md);
+    bottom: 42px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 132px;
+    max-width: min(260px, calc(100% - 2 * var(--space-md)));
+    padding: 0.5rem 0.65rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-card) 94%, var(--accent) 6%);
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    animation: hana-popout var(--duration-fast) var(--ease-out);
+}
+
+.audio-recording-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-muted) 38%, transparent);
+    flex: 0 0 9px;
+}
+
+.audio-recording-dot.is-live {
+    background: var(--coral);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--coral) 18%, transparent);
+    animation: audio-recording-pulse 1.25s ease-in-out infinite;
+}
+
+.audio-recording-copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.1rem;
+}
+
+.audio-recording-title {
+    font-size: 0.74rem;
+    line-height: 1.2;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.audio-recording-time {
+    font-size: 0.72rem;
+    line-height: 1.2;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.audio-recording-error {
+    max-width: 210px;
+    color: var(--danger);
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+
+.input-surface-mobile .audio-recording-card {
+    right: 0.75rem;
+    bottom: 44px;
+}
+
+@keyframes audio-recording-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(0.78);
+        opacity: 0.78;
+    }
+}
+
 .deleted-agent-overlay {
     position: absolute;
     inset: 0;
@@ -1438,6 +1564,116 @@
 /* 文件标签容器（输入框上方） */
 .attached-files {
     display: contents;
+}
+
+.media-attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.42rem;
+    height: 2rem;
+    max-width: min(15rem, 100%);
+    padding: 0 0.5rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-card) 88%, rgba(var(--accent-rgb), 0.08));
+    border: 1px solid rgba(var(--accent-rgb), 0.1);
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
+    vertical-align: middle;
+}
+
+.image-attachment-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2rem;
+    height: 1.2rem;
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.08);
+    border-radius: 5px;
+    overflow: hidden;
+    flex: 0 0 auto;
+}
+
+.image-attachment-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.media-attachment-name {
+    min-width: 0;
+    max-width: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.audio-attachment-play,
+.media-attachment-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: default;
+}
+
+.audio-attachment-play {
+    width: 1.18rem;
+    height: 1.18rem;
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.1);
+    border-radius: 6px;
+    transition: background var(--duration-instant), color var(--duration-instant);
+}
+
+.audio-attachment-play:hover {
+    background: rgba(var(--accent-rgb), 0.16);
+}
+
+.audio-attachment-play.is-playing {
+    color: white;
+    background: var(--accent);
+}
+
+.audio-attachment-wave {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 4.2rem;
+    height: 1.18rem;
+    padding: 0 0.08rem;
+    overflow: hidden;
+}
+
+.audio-attachment-bar {
+    display: block;
+    width: 2px;
+    min-height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 68%, var(--text-muted));
+    opacity: 0.62;
+}
+
+.media-attachment-remove {
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-muted);
+    border-radius: 50%;
+    opacity: 0.55;
+    transition: opacity var(--duration-instant), color var(--duration-instant);
+}
+
+.media-attachment-remove:hover {
+    color: var(--text);
+    opacity: 1;
 }
 
 .input-box p:global(.is-editor-empty):first-child::before {

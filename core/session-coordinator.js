@@ -42,7 +42,12 @@ import { prepareVisionInputForTextOnlyModel } from "./vision-prepare.js";
 import { prepareModelImageInputsForPrompt } from "./model-image-preprocess.js";
 import { pruneSessionInlineMediaHistory } from "./session-inline-media-prune.js";
 import { createVisionContextInjectionExtension } from "./vision-context-injector.js";
-import { modelSupportsDirectVideoInput, modelSupportsVideoInput } from "../shared/model-capabilities.js";
+import {
+  modelSupportsDirectAudioInput,
+  modelSupportsAudioInput,
+  modelSupportsDirectVideoInput,
+  modelSupportsVideoInput,
+} from "../shared/model-capabilities.js";
 import {
   normalizeSessionThinkingLevel,
   normalizeThinkingLevelForModel,
@@ -91,16 +96,28 @@ function assertVideoInputSupported(model, videos) {
   }
 }
 
+function assertAudioInputSupported(model, audios) {
+  if (!audios?.length) return;
+  if (!modelSupportsAudioInput(model)) {
+    throw new Error("current model does not support audio input");
+  }
+  if (!modelSupportsDirectAudioInput(model)) {
+    throw new Error("current provider does not support direct audio input");
+  }
+}
+
 function buildPromptMediaOptions(opts) {
   const media = [
     ...(opts?.images || []),
     ...(opts?.videos || []),
+    ...(opts?.audios || []),
   ];
   if (!media.length) return undefined;
   return {
     images: media,
     ...(opts.imageAttachmentPaths?.length ? { imageAttachmentPaths: opts.imageAttachmentPaths } : {}),
     ...(opts.videoAttachmentPaths?.length ? { videoAttachmentPaths: opts.videoAttachmentPaths } : {}),
+    ...(opts.audioAttachmentPaths?.length ? { audioAttachmentPaths: opts.audioAttachmentPaths } : {}),
   };
 }
 
@@ -1475,6 +1492,7 @@ export class SessionCoordinator {
     }));
     ({ text, opts } = await prepareModelImageInputsForPrompt({ text, opts }));
     assertVideoInputSupported(this._session.model, opts?.videos);
+    assertAudioInputSupported(this._session.model, opts?.audios);
     const promptOpts = buildPromptMediaOptions(opts);
     try {
       await this._session.prompt(text, promptOpts);
@@ -1559,6 +1577,7 @@ export class SessionCoordinator {
       }
     }
     assertVideoInputSupported(entry.session.model, opts?.videos);
+    assertAudioInputSupported(entry.session.model, opts?.audios);
     const promptOpts = buildPromptMediaOptions(opts);
     try {
       await entry.session.prompt(text, promptOpts);

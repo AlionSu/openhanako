@@ -25,6 +25,13 @@ import {
   isAllowedChatImageMime,
   isChatImageBase64WithinLimit,
 } from "../../shared/image-mime.js";
+import {
+  MAX_CHAT_AUDIO_BASE64_CHARS,
+  extensionFromChatAudioMime,
+  isAllowedChatAudioMime,
+  isAllowedUploadAudioMime,
+  isChatAudioBase64WithinLimit,
+} from "../../shared/audio-mime.js";
 import { registerSessionFileFromRequest } from "../../lib/session-files/session-file-response.js";
 import { sessionFilesCacheDir } from "../../lib/session-files/session-file-registry.js";
 
@@ -57,7 +64,22 @@ const WINDOWS_RESERVED_DEVICE_NAMES = new Set([
 ]);
 
 function extFromMime(mimeType) {
-  return extensionFromChatImageMime(mimeType);
+  return extensionFromChatImageMime(mimeType) || extensionFromChatAudioMime(mimeType);
+}
+
+function isAllowedUploadBlobMime(mimeType) {
+  return isAllowedChatImageMime(mimeType) || isAllowedUploadAudioMime(mimeType);
+}
+
+function isUploadBlobBase64WithinLimit(base64Data, mimeType) {
+  if (isAllowedChatImageMime(mimeType)) return isChatImageBase64WithinLimit(base64Data);
+  if (isAllowedUploadAudioMime(mimeType)) return isChatAudioBase64WithinLimit(base64Data);
+  return false;
+}
+
+function uploadBlobMaxBase64Chars(mimeType) {
+  if (isAllowedUploadAudioMime(mimeType)) return MAX_CHAT_AUDIO_BASE64_CHARS;
+  return MAX_CHAT_IMAGE_BASE64_CHARS;
 }
 
 function isControlCodePoint(codePoint) {
@@ -108,7 +130,8 @@ function sanitizeFileNameCandidate(value) {
 }
 
 function sanitizeBlobName(name, mimeType) {
-  const fallback = `pasted${extFromMime(mimeType) || ".png"}`;
+  const fallbackBase = isAllowedChatAudioMime(mimeType) ? "recording" : "pasted";
+  const fallback = `${fallbackBase}${extFromMime(mimeType) || ".bin"}`;
   if (!name || typeof name !== "string") return fallback;
   // 用户传入的 name 不可信：只保留跨平台 basename，再清理文件系统保留字符。
   let base = sanitizeFileNameCandidate(name);
@@ -309,7 +332,7 @@ export function createUploadRoute(engine) {
 
   // POST /api/upload-blob
   // Body: { blobs: [{ name, base64Data, mimeType }, ...] }  (also accepts singular { name, base64Data, mimeType })
-  // 把内存中的 base64 数据落到与 /api/upload 同一个 uploads 目录，输出形态保持一致
+  // 把内存中的 base64 图片/音频数据落到与 /api/upload 同一个 uploads 目录，输出形态保持一致
   route.post("/upload-blob", async (c) => {
     const body = await safeJson(c);
     const sessionPath = normalizeSessionPath(body?.sessionPath);
@@ -339,12 +362,12 @@ export function createUploadRoute(engine) {
           results.push({ error: "base64Data required" });
           continue;
         }
-        if (typeof mimeType !== "string" || !isAllowedChatImageMime(mimeType)) {
+        if (typeof mimeType !== "string" || !isAllowedUploadBlobMime(mimeType)) {
           results.push({ error: "unsupported mimeType" });
           continue;
         }
-        if (!isChatImageBase64WithinLimit(base64Data)) {
-          results.push({ error: `blob too large (max ${MAX_CHAT_IMAGE_BASE64_CHARS} bytes)` });
+        if (!isUploadBlobBase64WithinLimit(base64Data, mimeType)) {
+          results.push({ error: `blob too large (max ${uploadBlobMaxBase64Chars(mimeType)} bytes)` });
           continue;
         }
         const buf = Buffer.from(base64Data, "base64");
