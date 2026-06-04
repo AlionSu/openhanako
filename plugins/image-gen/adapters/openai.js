@@ -3,19 +3,16 @@ import fs from "fs";
 import path from "path";
 import { saveImage } from "../lib/download.js";
 import { resolveModelId } from "../lib/model-catalog.js";
+import {
+  IMAGE_RESOLUTION_TIERS,
+  OPENAI_IMAGE_RATIOS,
+  resolveOpenAiImageSize,
+} from "../lib/resolution-tiers.js";
 
 const FORMAT_TO_MIME = {
   png: "image/png",
   jpeg: "image/jpeg",
   webp: "image/webp",
-};
-
-// OpenAI gpt-image 支持的尺寸
-const OPENAI_RATIO_TO_SIZE = {
-  "1:1": "1024x1024",
-  "4:3": "1536x1024", "3:4": "1024x1536",
-  "16:9": "1536x1024", "9:16": "1024x1536",
-  "3:2": "1536x1024", "2:3": "1024x1536",
 };
 
 function normalizeImages(image) {
@@ -60,8 +57,8 @@ export const openaiImageAdapter = {
   name: "OpenAI Image",
   types: ["image"],
   capabilities: {
-    ratios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3"],
-    resolutions: [],
+    ratios: [...OPENAI_IMAGE_RATIOS],
+    resolutions: [...IMAGE_RESOLUTION_TIERS],
   },
 
   async checkAuth(ctx) {
@@ -96,7 +93,7 @@ export const openaiImageAdapter = {
 
     // 4. Translate params → API body
     const outputFormat = params.format || providerDefaults?.format || "jpeg";
-    const effectiveRatio = params.aspect_ratio || params.aspectRatio || providerDefaults?.aspect_ratio;
+    const effectiveRatio = params.aspect_ratio || params.aspectRatio || params.ratio || providerDefaults?.aspect_ratio;
     const body = {
       model: modelId,
       prompt: params.prompt,
@@ -104,14 +101,15 @@ export const openaiImageAdapter = {
       output_format: outputFormat,
     };
 
-    // size: 显式 size > 长宽比查表 > provider 默认
-    if (params.size) {
-      body.size = params.size;
-    } else if (effectiveRatio && OPENAI_RATIO_TO_SIZE[effectiveRatio]) {
-      body.size = OPENAI_RATIO_TO_SIZE[effectiveRatio];
-    } else if (providerDefaults?.size) {
-      body.size = providerDefaults.size;
-    }
+    const size = resolveOpenAiImageSize(
+      { ...params, ratio: effectiveRatio },
+      providerDefaults,
+      {
+        sourceName: "OpenAI image",
+        flexible: String(modelId).startsWith("gpt-image-2"),
+      },
+    );
+    if (size) body.size = size;
 
     const quality = params.quality || providerDefaults?.quality;
     if (quality) body.quality = quality;

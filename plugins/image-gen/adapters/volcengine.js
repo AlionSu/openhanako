@@ -25,9 +25,17 @@ const SIZE_TABLE = {
   },
 };
 
+function normalizeSeedreamSizeTier(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const match = raw.toLowerCase().match(/^([124])\s*k$/);
+  if (!match) return raw;
+  return match[1] === "4" ? "4K" : "2K";
+}
+
 function resolveSize(size, aspectRatio, providerDefaults) {
   const effectiveRatio = aspectRatio || providerDefaults?.aspect_ratio || providerDefaults?.ratio;
-  const effectiveSize = size || providerDefaults?.size || providerDefaults?.resolution || "2K";
+  const effectiveSize = normalizeSeedreamSizeTier(size || providerDefaults?.size || providerDefaults?.resolution || "2K");
 
   if (effectiveRatio) {
     // 查表：分辨率档位 + 比例 → 像素值
@@ -82,7 +90,7 @@ export const volcengineImageAdapter = {
   types: ["image"],
   capabilities: {
     ratios: ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"],
-    resolutions: ["2k", "4k"],
+    resolutions: ["1k", "2k", "4k"],
   },
 
   async checkAuth(ctx) {

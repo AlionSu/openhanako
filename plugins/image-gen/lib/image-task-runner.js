@@ -50,6 +50,7 @@ export function buildImageParams(input) {
     prompt: input.prompt,
     ...(input.ratio && { ratio: input.ratio }),
     ...(input.resolution && { resolution: input.resolution }),
+    ...(input.quality && { quality: input.quality }),
     ...(input.model && { model: input.model }),
     ...(input.image && { image: input.image }),
   };

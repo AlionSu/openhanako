@@ -96,10 +96,19 @@ function modelFamily(modelId) {
   return "wan";
 }
 
+function normalizeDashScopeSize(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const tier = raw.toLowerCase().match(/^([124])\s*k$/);
+  if (tier) return `${tier[1]}K`;
+  return raw;
+}
+
 function generationParameters(params, family) {
+  const size = normalizeDashScopeSize(params.size || params.resolution);
   const parameters = {
     n: 1,
-    ...(params.size || params.resolution ? { size: params.size || params.resolution } : {}),
+    ...(size ? { size } : {}),
   };
   if (family === "wan") {
     if (params.aspect_ratio || params.aspectRatio || params.ratio) {

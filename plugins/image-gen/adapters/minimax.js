@@ -64,6 +64,10 @@ export const minimaxImageAdapter = {
   },
 
   async submit(params, ctx) {
+    if (params.size || params.resolution) {
+      throw new Error("MiniMax image size/resolution is unsupported");
+    }
+
     const creds = await getCredentials(ctx, params);
     const body = {
       model: params.modelId || params.model || "image-01",
