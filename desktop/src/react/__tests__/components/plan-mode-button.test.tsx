@@ -113,6 +113,8 @@ describe('PlanModeButton', () => {
     const optionAskBlock = css.match(/\.plan-mode-option-ask\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
     const optionReadOnlyBlock = css.match(/\.plan-mode-option-read_only\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
     const optionActiveBlock = css.match(/\.plan-mode-option\.active\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
+    const dropdownBlock = css.match(/\.thinking-dropdown\.plan-mode-dropdown\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
+    const optionBlock = css.match(/\.plan-mode-option\s*\{(?<body>[^}]*)\}/)?.groups?.body || '';
 
     expect(askBlock).not.toMatch(/color\s*:|background\s*:|border-color\s*:/);
     expect(autoBlock).toContain('var(--permission-auto');
@@ -130,5 +132,8 @@ describe('PlanModeButton', () => {
     expect(optionAskBlock).not.toMatch(/background\s*:/);
     expect(optionReadOnlyBlock).not.toMatch(/background\s*:/);
     expect(optionActiveBlock).toMatch(/font-weight\s*:\s*400/);
+    expect(dropdownBlock).toContain('width: max-content');
+    expect(dropdownBlock).toMatch(/min-width\s*:\s*0/);
+    expect(optionBlock).toContain('white-space: nowrap');
   });
 });

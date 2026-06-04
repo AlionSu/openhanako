@@ -316,7 +316,8 @@
 .thinking-dropdown.plan-mode-dropdown {
     left: 0;
     right: auto;
-    min-width: 9.25rem;
+    width: max-content;
+    min-width: 0;
     transform-origin: bottom left;
 }
 
@@ -349,6 +350,7 @@
 .plan-mode-option {
     align-items: center;
     gap: 0.45rem;
+    white-space: nowrap;
 }
 
 .plan-mode-option.active {
