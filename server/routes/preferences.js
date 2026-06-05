@@ -113,6 +113,7 @@ export function createPreferencesRoute(engine, { platform = process.platform } =
 
       return c.json({
         models,
+        thinking_level: engine.getThinkingLevel?.() || "medium",
         search: {
           provider: search.provider || "",
           api_key: maskSecretValue(search.api_key || ""),

@@ -3111,7 +3111,11 @@
       "submit": "Sign In"
     },
     "loading": "Connecting to Hana...",
-    "closeSidebar": "Close sidebar"
+    "closeSidebar": "Close sidebar",
+    "update": {
+      "available": "A new Hana version is ready",
+      "reload": "Refresh"
+    }
   },
   "approval": {
     "toolAction": {

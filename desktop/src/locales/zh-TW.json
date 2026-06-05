@@ -2506,6 +2506,8 @@
   "status.disconnected": "连接已断开",
   "status.reconnect": "重新连接",
   "action.retry": "重试",
+  "mobile.update.available": "Hana 有新版本可用",
+  "mobile.update.reload": "重新整理",
   "subagentAbort": "終止",
   "subagentAborted": "已終止",
   "preview.toggle": "預覽面板",

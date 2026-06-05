@@ -2514,6 +2514,8 @@
   "status.disconnected": "Connection lost",
   "status.reconnect": "Reconnect",
   "action.retry": "Retry",
+  "mobile.update.available": "새 Hana 버전이 준비됐어요",
+  "mobile.update.reload": "새로고침",
   "subagentAbort": "중지",
   "subagentAborted": "중지됨",
   "preview.toggle": "미리보기 패널",

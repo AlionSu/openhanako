@@ -61,7 +61,12 @@ describe("mobile workbench route", () => {
       agentName: "Hana",
       userName: "Owner",
       currentAgentId: "hana",
-      config: { cwd_history: [workspace] },
+      config: {
+        cwd_history: [workspace],
+        memory: { enabled: false },
+        editor: { markdown: { bodyFontSize: 18 } },
+      },
+      getThinkingLevel: () => "high",
       agent: {
         config: {
           agent: { yuan: "hanako" },
@@ -91,6 +96,9 @@ describe("mobile workbench route", () => {
       currentAgentId: "hana",
       homeFolder: workspace,
       cwdHistory: [workspace],
+      memoryEnabled: false,
+      thinkingLevel: "high",
+      editor: { markdown: { bodyFontSize: 18 } },
       appearance: { theme: "warm-paper", serif: true },
     });
     expect(data.agents).toEqual([

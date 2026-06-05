@@ -2810,7 +2810,11 @@
       "submit": "登录"
     },
     "loading": "正在连接 Hana...",
-    "closeSidebar": "关闭侧边栏"
+    "closeSidebar": "关闭侧边栏",
+    "update": {
+      "available": "Hana 有新版本可用",
+      "reload": "刷新"
+    }
   },
   "approval": {
     "toolAction": {

@@ -2514,6 +2514,8 @@
   "status.disconnected": "Connection lost",
   "status.reconnect": "Reconnect",
   "action.retry": "Retry",
+  "mobile.update.available": "Hana の新しいバージョンがあります",
+  "mobile.update.reload": "更新",
   "subagentAbort": "停止",
   "subagentAborted": "停止済み",
   "preview.toggle": "プレビューパネル",

@@ -41,4 +41,27 @@ describe('Mobile PWA entry split', () => {
     expect(imports).not.toContain('../components/PreviewPanel');
     expect(imports).not.toContain('../components/shared/MediaViewer/MediaViewer');
   });
+
+  it('wires service worker update detection to an explicit mobile refresh event', () => {
+    const entrySource = readFileSync(path.join(process.cwd(), 'desktop/src/mobile-main.tsx'), 'utf8');
+    const serviceWorkerSource = readFileSync(path.join(process.cwd(), 'desktop/src/mobile-sw.js'), 'utf8');
+
+    expect(entrySource).toContain('hana-mobile-update-available');
+    expect(entrySource).toContain('hana-mobile-apply-update');
+    expect(entrySource).toContain('updatefound');
+    expect(entrySource).toContain('controllerchange');
+    expect(entrySource).toContain('registration.update()');
+    expect(serviceWorkerSource).toContain("event.data?.type === 'SKIP_WAITING'");
+    expect(serviceWorkerSource).toContain('self.skipWaiting()');
+  });
+
+  it('serves mobile PWA assets explicitly in Vite dev instead of falling back to HTML', () => {
+    const viteConfig = readFileSync(path.join(process.cwd(), 'vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain("name: 'hana-serve-mobile-pwa-static-files'");
+    expect(viteConfig).toContain("['/sw.js'");
+    expect(viteConfig).toContain("'application/javascript; charset=utf-8'");
+    expect(viteConfig).toContain("['/manifest.webmanifest'");
+    expect(viteConfig).toContain("'application/manifest+json; charset=utf-8'");
+  });
 });

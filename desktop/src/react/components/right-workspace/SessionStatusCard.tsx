@@ -58,6 +58,7 @@ export function SessionStatusCard() {
     : authorizedFolders.length === 1
       ? workspaceDisplayName(authorizedFolders[0], authorizedFolders[0])
       : `${workspaceDisplayName(authorizedFolders[0], authorizedFolders[0])} +${authorizedFolders.length - 1}`;
+  const canSelectAuthorizedFolder = typeof window.platform?.selectFolder === 'function';
 
   async function handleAddAuthorizedFolder(event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
@@ -97,16 +98,18 @@ export function SessionStatusCard() {
           <span className={styles.title}>{t('rightWorkspace.session.title')}</span>
         </button>
         <div className={styles.headerActions}>
-          <button
-            className={styles.iconButton}
-            type="button"
-            onClick={handleAddAuthorizedFolder}
-            disabled={addingFolder}
-            aria-label={t('rightWorkspace.session.addAuthorizedFolder')}
-            title={t('rightWorkspace.session.addAuthorizedFolder')}
-          >
-            <FolderAddIcon />
-          </button>
+          {canSelectAuthorizedFolder && (
+            <button
+              className={styles.iconButton}
+              type="button"
+              onClick={handleAddAuthorizedFolder}
+              disabled={addingFolder}
+              aria-label={t('rightWorkspace.session.addAuthorizedFolder')}
+              title={t('rightWorkspace.session.addAuthorizedFolder')}
+            >
+              <FolderAddIcon />
+            </button>
+          )}
           <button
             className={styles.iconButton}
             type="button"

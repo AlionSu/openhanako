@@ -146,6 +146,17 @@ describe('FloatingActions cover gallery', () => {
     expect(screen.getByRole('button', { name: 'cover.gallery.upload' })).toBeEnabled();
   });
 
+  it('hides upload cover when the runtime has no file picker capability', async () => {
+    window.platform = {} as unknown as PlatformApi;
+
+    render(<FloatingActions content="# Demo\n" filePath="/tmp/note.md" contentType="markdown" />);
+
+    await waitFor(() => expect(screen.getByLabelText('cover.make')).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText('cover.make'));
+
+    expect(screen.queryByRole('button', { name: 'cover.gallery.upload' })).not.toBeInTheDocument();
+  });
+
   it('refreshes markdown preview toggle i18n after locale sync', async () => {
     window.t = ((key: string) => key) as typeof window.t;
 

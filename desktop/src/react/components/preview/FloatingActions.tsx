@@ -252,6 +252,7 @@ export function FloatingActions({
   const agentGenerateStatus = coverStatus?.agentGenerate ?? {};
   const agentGenerateEnabled = Boolean(agentGenerateStatus.enabled ?? coverStatus?.enabled);
   const agentGenerateDisabledText = getAgentGenerateDisabledText(agentGenerateStatus);
+  const canSelectCoverFile = typeof window.platform?.selectFiles === 'function';
 
   const handleCoverGalleryImageError = useCallback((itemId: string) => {
     setBrokenCoverGalleryIds((current) => {
@@ -322,10 +323,12 @@ export function FloatingActions({
                   <span className={styles.coverMenuIcon}><GalleryCoverIcon /></span>
                   <span>{t('cover.gallery.title')}</span>
                 </button>
-                <button type="button" onClick={handleUploadCover}>
-                  <span className={styles.coverMenuIcon}><UploadCoverIcon /></span>
-                  <span>{t('cover.gallery.upload')}</span>
-                </button>
+                {canSelectCoverFile && (
+                  <button type="button" onClick={handleUploadCover}>
+                    <span className={styles.coverMenuIcon}><UploadCoverIcon /></span>
+                    <span>{t('cover.gallery.upload')}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

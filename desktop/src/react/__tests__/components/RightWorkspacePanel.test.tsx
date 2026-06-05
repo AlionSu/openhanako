@@ -130,6 +130,7 @@ describe('RightWorkspacePanel', () => {
     vi.mocked(openMediaViewerForRef).mockClear();
     vi.mocked(hanaFetch).mockReset();
     vi.mocked(hanaFetch).mockImplementation(async () => jsonResponse({ sessions: [] }));
+    document.documentElement.removeAttribute('data-platform');
     window.platform = {
       openFolder: () => undefined,
       openFile: vi.fn(),
@@ -161,6 +162,14 @@ describe('RightWorkspacePanel', () => {
     expect((tabList as HTMLElement).style.getPropertyValue('--right-workspace-active-tab-index')).toBe('1');
     expect(screen.getByText('hana-work')).toBeInTheDocument();
     expect(screen.queryByText(/工作台 ·/)).not.toBeInTheDocument();
+  });
+
+  it('hides desktop-only open-folder controls in the PWA workspace', () => {
+    document.documentElement.setAttribute('data-platform', 'web');
+
+    render(<RightWorkspacePanel />);
+
+    expect(screen.queryByRole('button', { name: '打开文件夹' })).not.toBeInTheDocument();
   });
 
   it('moves the tab slider when switching between session files and workspace', () => {
@@ -370,6 +379,63 @@ describe('RightWorkspacePanel', () => {
     const download = screen.getByRole('link', { name: '下载到本机 report.pdf' });
     expect(download).toHaveAttribute('href', 'http://hana.local:14500/api/resources/res_sf_report/content');
     expect(download).toHaveAttribute('download', 'report.pdf');
+  });
+
+  it('uses preview and download actions without local path controls in the PWA session file panel', () => {
+    document.documentElement.setAttribute('data-platform', 'web');
+    resetStore([]);
+    useStore.setState({
+      activeServerConnection: {
+        connectionId: 'browser:server_lan',
+        kind: 'lan',
+        serverId: 'server_lan',
+        userId: 'user_lan',
+        studioId: 'studio_lan',
+        label: 'LAN Hana',
+        baseUrl: 'http://hana.local:14500',
+        wsUrl: 'ws://hana.local:14500',
+        token: null,
+        authState: 'paired',
+        trustState: 'lan',
+        credentialKind: 'device_credential',
+        platformAccountId: null,
+        officialServiceKind: null,
+        capabilities: ['resources', 'files'],
+      },
+      sessionRegistryFilesByPath: {
+        '/sessions/main.jsonl': [{
+          fileId: 'sf_report',
+          filePath: '/remote/cache/report.pdf',
+          label: 'report.pdf',
+          ext: 'pdf',
+          status: 'available',
+          resource: {
+            schemaVersion: 1,
+            resourceId: 'res_sf_report',
+            name: 'studios/studio_lan/resources/res_sf_report',
+            studioId: 'studio_lan',
+            type: 'file',
+            source: 'session_file',
+            fileId: 'sf_report',
+            lifecycle: { status: 'available', missingAt: null },
+            storage: { provider: 'session_file', localOnly: true },
+            links: {
+              self: '/api/resources/res_sf_report',
+              content: '/api/resources/res_sf_report/content',
+            },
+          },
+        }],
+      },
+    } as never);
+
+    render(<RightWorkspacePanel />);
+    fireEvent.click(screen.getByRole('tab', { name: '对话文件' }));
+
+    expect(screen.getByRole('button', { name: '预览 report.pdf' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '下载到本机 report.pdf' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开 report.pdf' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '定位 report.pdf' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '复制路径 report.pdf' })).not.toBeInTheDocument();
   });
 
   it('sorts session files without a manual refresh or add entry', () => {
