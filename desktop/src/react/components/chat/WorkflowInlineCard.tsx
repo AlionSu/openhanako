@@ -11,7 +11,6 @@ import { formatElapsed } from '../../utils/format-duration';
 import { ChatResourceCard } from './ChatResourceCard';
 import { WorkflowResourceIcon } from './ChatResourceIcons';
 import { WorkflowProgressDots } from '../shared/WorkflowProgressDots';
-import cardStyles from './WorkflowInlineCard.module.css';
 
 interface WorkflowInlineCardProps {
   block: {
@@ -62,25 +61,22 @@ export const WorkflowInlineCard = memo(function WorkflowInlineCard({ block }: Wo
     duration = formatElapsed(block.finishedAt - block.startedAt);
   }
 
-  const subtitleParts: string[] = [];
-  if (duration) subtitleParts.push(duration);
-  if (agentCount > 0) subtitleParts.push(t('rightWorkspace.workflow.agents', { n: agentCount }));
-  const subtitle = subtitleParts.join(' · ') || block.summary || 'Workflow';
+  const metaParts: string[] = [];
+  if (agentCount > 0) metaParts.push(t('rightWorkspace.workflow.agents', { n: agentCount }));
+  if (duration) metaParts.push(duration);
+  const titleMeta = metaParts.join(' · ') || undefined;
 
   return (
-    <div>
-      <ChatResourceCard
-        icon={<WorkflowResourceIcon />}
-        title={block.taskTitle || t('rightWorkspace.workflow.title')}
-        subtitle={subtitle}
-        statusLabel={statusLabel(block.streamStatus)}
-        statusTone={statusTone(block.streamStatus)}
-      />
-      {childNodes.length > 0 && (
-        <div className={cardStyles.dotsRow}>
-          <WorkflowProgressDots nodes={childNodes} agents={agents} size="sm" />
-        </div>
-      )}
-    </div>
+    <ChatResourceCard
+      icon={<WorkflowResourceIcon />}
+      title={block.taskTitle || t('rightWorkspace.workflow.title')}
+      titleMeta={titleMeta}
+      subtitle={childNodes.length > 0
+        ? <WorkflowProgressDots nodes={childNodes} agents={agents} size="sm" />
+        : (block.summary || undefined)
+      }
+      statusLabel={statusLabel(block.streamStatus)}
+      statusTone={statusTone(block.streamStatus)}
+    />
   );
 });

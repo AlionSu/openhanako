@@ -33,11 +33,11 @@ export const WorkflowProgressDots = memo(function WorkflowProgressDots({
   const sorted = [...nodes].sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
 
   return (
-    <div className={`${styles.dots}${className ? ` ${className}` : ''}`}>
+    <span className={`${styles.dots}${className ? ` ${className}` : ''}`}>
       {sorted.map((node) => {
         if (node.kind === 'workflow_step') {
           return (
-            <span key={node.id} className={styles.dot} data-status={node.status}>
+            <span key={node.id} className={styles.dot} data-status={node.status} data-step-kind={node.stepKind}>
               <StepShape stepKind={node.stepKind} size={px} />
             </span>
           );
@@ -57,6 +57,6 @@ export const WorkflowProgressDots = memo(function WorkflowProgressDots({
           </span>
         );
       })}
-    </div>
+    </span>
   );
 });
