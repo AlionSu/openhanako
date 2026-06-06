@@ -174,6 +174,7 @@ export interface SuggestionCardBlock {
   type: 'suggestion_card';
   kind: 'automation_draft' | string;
   confirmId?: string;
+  operation?: 'create' | 'update' | string;
   status: 'pending' | 'approved' | 'rejected' | string;
   title: string;
   description?: string;
@@ -184,6 +185,7 @@ export interface SuggestionCardBlock {
   };
   detail?: {
     kind?: string;
+    operation?: 'create' | 'update' | string;
     jobData?: Record<string, unknown>;
     [key: string]: unknown;
   };

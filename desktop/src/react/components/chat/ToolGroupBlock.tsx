@@ -29,7 +29,10 @@ function getToolLabel(name: string, phase: string, agentName: string): string {
 function isCardBackedAutomationCreate(tool: ToolCall): boolean {
   if (tool.name !== 'automation') return false;
   const action = tool.args?.action;
-  return action === 'add_notify' || action === 'add_plugin_action';
+  return action === 'create'
+    || action === 'update'
+    || action === 'add_notify'
+    || action === 'add_plugin_action';
 }
 
 export const ToolGroupBlock = memo(function ToolGroupBlock({ tools: rawTools, collapsed: initialCollapsed, agentName = 'Hanako' }: Props) {

@@ -340,6 +340,37 @@
     box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08);
 }
 
+.scheduleSelect {
+    width: 100%;
+    max-width: none;
+}
+
+.scheduleSelectTrigger {
+    width: 100%;
+    min-width: 0;
+    height: 1.65rem;
+    padding: 0 7px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.72rem;
+    line-height: 1;
+    transition: background var(--duration-fast), border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.scheduleSelectTrigger:hover {
+    border-color: rgba(var(--accent-rgb), 0.2);
+    background: rgba(var(--accent-rgb), 0.025);
+}
+
+.scheduleSelectTrigger:focus-visible {
+    outline: none;
+    border-color: rgba(var(--accent-rgb), 0.35);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08);
+}
+
 .timePicker {
     position: relative;
     min-width: 0;
@@ -395,6 +426,8 @@
     border-radius: var(--radius-md);
     background: var(--bg-card, var(--bg));
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.13), 0 2px 8px rgba(0, 0, 0, 0.06);
+    animation: hana-popout var(--duration-fast) var(--ease-out);
+    transform-origin: top left;
 }
 
 .timePickerColumn {

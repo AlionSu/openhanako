@@ -1003,6 +1003,27 @@ export function createDeskRoute(engine, hub) {
         const { id, ...fields } = params;
         const existingJob = store.getJob(id);
         if (!existingJob) return c.json({ error: "not found" });
+        if (Object.prototype.hasOwnProperty.call(fields, "executor")) {
+          fields.executor = normalizeRouteExecutor(fields.executor);
+          const executorError = validateRouteExecutor(fields.executor);
+          if (executorError) return c.json({ error: executorError }, 400);
+        }
+        if (Object.prototype.hasOwnProperty.call(fields, "actorAgentId")) {
+          fields.actorAgentId = typeof fields.actorAgentId === "string" && fields.actorAgentId.trim()
+            ? fields.actorAgentId.trim()
+            : null;
+          if (!fields.actorAgentId) return c.json({ error: "actorAgentId required" }, 400);
+          if (typeof engine.getAgent === "function" && !engine.getAgent(fields.actorAgentId)) {
+            return c.json({ error: `agent not found: ${fields.actorAgentId}` }, 404);
+          }
+        }
+        if (Object.prototype.hasOwnProperty.call(fields, "executionContext")) {
+          const actorAgentId = typeof fields.actorAgentId === "string" && fields.actorAgentId.trim()
+            ? fields.actorAgentId.trim()
+            : existingJob.actorAgentId;
+          fields.executionContext = normalizeRouteExecutionContext(fields.executionContext, actorAgentId);
+          if (!fields.executionContext) return c.json({ error: "executionContext required" }, 400);
+        }
         const VALID_TYPES = new Set(["at", "every", "cron"]);
         if (fields.type !== undefined && !VALID_TYPES.has(fields.type)) {
           return c.json({ error: `Invalid scheduleType: ${fields.type}. Must be at/every/cron.` }, 400);

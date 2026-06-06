@@ -56,9 +56,10 @@ describe('AssistantMessage automation suggestion card', () => {
       return key;
     }) as typeof window.t;
     useStore.setState({
-      agents: [{ id: 'hanako', name: 'Hanako', yuan: 'hanako' }],
+      agents: [{ id: 'hanako', name: 'Hanako', yuan: 'hanako', homeFolder: '/home/hanako' }],
       agentName: 'Hanako',
       agentYuan: 'hanako',
+      currentAgentId: 'hanako',
       streamingSessions: [],
       selectedMessageIdsBySession: {},
     } as never);
@@ -101,6 +102,32 @@ describe('AssistantMessage automation suggestion card', () => {
       expect(hanaFetch).toHaveBeenCalledWith('/api/desk/cron', expect.objectContaining({
         method: 'POST',
       }));
+    });
+  });
+
+  it('submits the selected Agent identity from the draft card', async () => {
+    useStore.setState({
+      agents: [
+        { id: 'hanako', name: 'Hanako', yuan: 'hanako', homeFolder: '/home/hanako' },
+        { id: 'maomao', name: '毛毛', yuan: 'maomao', homeFolder: '/home/maomao' },
+      ],
+      currentAgentId: 'hanako',
+    } as never);
+
+    renderSuggestion('pending');
+
+    fireEvent.click(screen.getByRole('button', { name: 'automation.openDraft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'automation.field.agent' }));
+    fireEvent.click(screen.getByRole('option', { name: /毛毛/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'automation.confirmCreate' }));
+
+    await waitFor(() => {
+      const confirmCall = vi.mocked(hanaFetch).mock.calls.find(([url]) => url === '/api/confirm/confirm_1');
+      expect(confirmCall).toBeTruthy();
+      const body = JSON.parse((confirmCall?.[1] as RequestInit).body as string);
+      expect(body.value.jobData.actorAgentId).toBe('maomao');
+      expect(body.value.jobData.executor.agentId).toBe('maomao');
+      expect(body.value.jobData.executionContext.cwd).toBe('/home/maomao');
     });
   });
 });

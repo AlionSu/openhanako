@@ -11,10 +11,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 export function buildAutomationSuggestionBlock({
   confirmId = "",
   jobData,
+  operation = "create",
   status = "pending",
 }: {
   confirmId?: string;
   jobData: Record<string, unknown>;
+  operation?: "create" | "update";
   status?: "pending" | "approved" | "rejected";
 }) {
   const executor = asRecord(jobData.executor);
@@ -26,11 +28,13 @@ export function buildAutomationSuggestionBlock({
     kind: "automation_draft",
     confirmId,
     status,
+    operation,
     title,
     description: prompt,
     target: agentId ? { type: "agent", id: agentId } : undefined,
     detail: {
       kind: "automation_draft",
+      operation,
       jobData,
     },
     actions: [

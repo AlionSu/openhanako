@@ -83,16 +83,24 @@ describe('ToolGroupBlock', () => {
     expect(screen.getByText('npm test')).toBeTruthy();
   });
 
-  it('hides automation create tools because the suggestion card is the UI', () => {
+  it('hides automation create/update tools because the suggestion card is the UI', () => {
     const { container } = render(
       <ToolGroupBlock
         collapsed={false}
-        tools={[{
-          name: 'automation',
-          args: { action: 'add_notify', label: 'Tea' },
-          done: true,
-          success: true,
-        }]}
+        tools={[
+          {
+            name: 'automation',
+            args: { action: 'create', label: 'Tea' },
+            done: true,
+            success: true,
+          },
+          {
+            name: 'automation',
+            args: { action: 'update', id: 'job_1' },
+            done: true,
+            success: true,
+          },
+        ]}
       />,
     );
 

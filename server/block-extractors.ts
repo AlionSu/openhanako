@@ -106,10 +106,11 @@ export const BLOCK_EXTRACTORS = {
   },
 
   automation: (details) => {
-    if (details.action !== "pending_add" || !details.jobData) return null;
+    if (!["pending_add", "pending_update"].includes(details.action) || !details.jobData) return null;
     return [buildAutomationSuggestionBlock({
       confirmId: details.confirmId || "",
       jobData: details.jobData,
+      operation: details.operation === "update" ? "update" : "create",
       status: "pending",
     })];
   },

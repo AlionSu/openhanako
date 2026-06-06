@@ -154,6 +154,8 @@ export function ScheduleEditor({
       <label className={styles.field}>
         <span>{t('automation.field.schedule')}</span>
         <SelectWidget
+          className={styles.scheduleSelect}
+          triggerClassName={styles.scheduleSelectTrigger}
           options={SCHEDULE_MODES.map((mode): SelectOption => ({ value: mode, label: t(`automation.schedule.mode.${mode}`) }))}
           value={draft.mode}
           onChange={v => update({ mode: v as ScheduleMode })}
@@ -175,6 +177,8 @@ export function ScheduleEditor({
           <label className={styles.field}>
             <span>{t('automation.schedule.unit')}</span>
             <SelectWidget
+              className={styles.scheduleSelect}
+              triggerClassName={styles.scheduleSelectTrigger}
               options={INTERVAL_UNITS.map((unit): SelectOption => ({ value: unit, label: t(`automation.schedule.unitLabel.${unit}`) }))}
               value={draft.intervalUnit}
               onChange={v => update({ intervalUnit: v as IntervalUnit })}
@@ -195,6 +199,8 @@ export function ScheduleEditor({
           <label className={styles.field}>
             <span>{t('automation.schedule.weekday')}</span>
             <SelectWidget
+              className={styles.scheduleSelect}
+              triggerClassName={styles.scheduleSelectTrigger}
               options={days.map((name, index): SelectOption => ({ value: String(index), label: `${t('cron.weekPrefix')}${name}` }))}
               value={draft.weekday}
               onChange={v => update({ weekday: v })}

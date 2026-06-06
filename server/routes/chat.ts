@@ -704,6 +704,7 @@ export function createChatRoute(engine: any, hub: any, { upgradeWebSocket }: any
         block: buildAutomationSuggestionBlock({
           confirmId: event.confirmId,
           jobData: event.jobData || {},
+          operation: event.operation === "update" ? "update" : "create",
           status: "pending",
         }),
       });

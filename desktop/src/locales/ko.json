@@ -1945,6 +1945,7 @@
     "openDraft": "자동화 초안 열기",
     "closeDraft": "자동화 초안 닫기",
     "confirmCreate": "추가 확인",
+    "confirmUpdate": "수정 확인",
     "defaultModel": "기본 모델",
     "add": "자동화 추가",
     "enable": "사용",
@@ -1957,6 +1958,7 @@
     "agentRequired": "먼저 Agent를 선택해 주세요",
     "field": {
       "label": "이름",
+      "agent": "Agent",
       "scheduleType": "유형",
       "schedule": "시간",
       "prompt": "실행 내용"

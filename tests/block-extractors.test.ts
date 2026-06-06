@@ -509,9 +509,21 @@ describe('automation', () => {
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('suggestion_card');
     expect(result[0].kind).toBe('automation_draft');
+    expect(result[0].operation).toBe('create');
     expect(result[0].status).toBe('pending');
     expect(result[0].confirmId).toBe('confirm_auto');
     expect(result[0].detail.jobData).toBe(jobData);
+  });
+
+  it('pending update with jobData returns an update automation suggestion card', () => {
+    const result = extractor({ action: 'pending_update', operation: 'update', jobData: { ...jobData, id: 'job_1' }, confirmId: 'confirm_update' });
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe('suggestion_card');
+    expect(result[0].kind).toBe('automation_draft');
+    expect(result[0].operation).toBe('update');
+    expect(result[0].status).toBe('pending');
+    expect(result[0].confirmId).toBe('confirm_update');
+    expect(result[0].detail.operation).toBe('update');
   });
 
   it('confirmed add does not duplicate the live confirmation card', () => {

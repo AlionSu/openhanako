@@ -1945,6 +1945,7 @@
     "openDraft": "自動化ドラフトを開く",
     "closeDraft": "自動化ドラフトを閉じる",
     "confirmCreate": "追加を確認",
+    "confirmUpdate": "変更を確認",
     "defaultModel": "デフォルトモデル",
     "add": "自動化を追加",
     "enable": "有効化",
@@ -1957,6 +1958,7 @@
     "agentRequired": "先に Agent を選択してください",
     "field": {
       "label": "名前",
+      "agent": "Agent",
       "scheduleType": "種類",
       "schedule": "時間",
       "prompt": "実行内容"

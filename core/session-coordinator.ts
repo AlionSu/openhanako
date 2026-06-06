@@ -3606,10 +3606,10 @@ export class SessionCoordinator {
       const patrolAllowed = opts.toolFilter
         || targetAgent.config?.desk?.patrol_tools
         || PATROL_TOOLS_DEFAULT;
-      // heartbeat 巡检中屏蔽 cron 工具：agent 在巡检里 cron.create 一个 3 分钟任务
+      // heartbeat 巡检中屏蔽自动化工具：agent 在巡检里创建一个 3 分钟任务
       // 会让该任务持续触发后续巡检/活动，看起来像「巡检间隔被破坏」(#398)
       const isHeartbeat = opts.activityType === "heartbeat";
-      const heartbeatBlocked = new Set(isHeartbeat ? ["cron"] : []);
+      const heartbeatBlocked = new Set(isHeartbeat ? ["automation", "cron"] : []);
       const actCustomTools = patrolAllowed === "*"
         ? allCustomTools.filter(t => !heartbeatBlocked.has(t.name))
         : allCustomTools.filter(t => new Set(patrolAllowed).has(t.name) && !heartbeatBlocked.has(t.name));

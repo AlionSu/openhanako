@@ -37,6 +37,7 @@ import { selectIsStreamingSession, selectSelectedIdsBySession } from '../../stor
 import { extractSelectedTexts } from '../../utils/message-text';
 import { AgentAvatar, resolveAgentDisplayInfo } from '../../utils/agent-display';
 import { ScheduleEditor } from '../automation/ScheduleEditor';
+import { SelectWidget, type SelectOption } from '@/ui';
 import {
   scheduleDraftFromStored,
   schedulePreviewFromDraft,
@@ -305,7 +306,7 @@ const ContentBlockView = memo(function ContentBlockView({ block, agentName, agen
       return <InterludeBlock block={block} />;
     default: {
       const Renderer = BLOCK_RENDERERS[block.type];
-      return Renderer ? <Renderer block={block} agentId={agentId} /> : null;
+      return Renderer ? <Renderer block={block} agentId={agentId} sessionPath={sessionPath} /> : null;
     }
   }
 });
@@ -703,7 +704,52 @@ const SkillBlock = memo(function SkillBlock({ block }: { block: any }) {
 
 // cron_confirm block
 
-const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any }) {
+function automationRecord(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, any>
+    : {};
+}
+
+function defaultAutomationAgentId(agents: any[], currentAgentId: string | null, draftAgentId: string | null) {
+  return draftAgentId
+    || currentAgentId
+    || agents.find((agent: any) => agent?.isPrimary)?.id
+    || agents[0]?.id
+    || null;
+}
+
+function buildAutomationExecutionContext({
+  agent,
+  agentId,
+  baseContext,
+  sessionPath,
+}: {
+  agent: any;
+  agentId: string | null;
+  baseContext: Record<string, any>;
+  sessionPath?: string;
+}) {
+  const homeFolder = typeof agent?.homeFolder === 'string' && agent.homeFolder.trim()
+    ? agent.homeFolder.trim()
+    : null;
+  return {
+    kind: typeof baseContext.kind === 'string' && baseContext.kind.trim()
+      ? baseContext.kind
+      : 'session_workspace',
+    cwd: homeFolder || (typeof baseContext.cwd === 'string' && baseContext.cwd.trim() ? baseContext.cwd : null),
+    workspaceFolders: homeFolder
+      ? [homeFolder]
+      : (Array.isArray(baseContext.workspaceFolders)
+        ? baseContext.workspaceFolders.filter((folder: unknown) => typeof folder === 'string' && folder.trim())
+        : []),
+    sourceSessionPath: typeof baseContext.sourceSessionPath === 'string' && baseContext.sourceSessionPath.trim()
+      ? baseContext.sourceSessionPath
+      : (sessionPath || null),
+    createdByAgentId: agentId || null,
+  };
+}
+
+const CronConfirmBlock = memo(function CronConfirmBlock({ block, sessionPath }: { block: any; sessionPath?: string }) {
   const [status, setStatus] = useState(block.status);
   const [modalOpen, setModalOpen] = useState(false);
   const isSuggestionCard = block.type === 'suggestion_card';
@@ -711,8 +757,11 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
     || block.kind === 'automation_draft'
     || block.detail?.kind === 'automation_draft';
   const jobData = block.jobData || block.detail?.jobData || {};
+  const operation = block.operation || block.detail?.operation || 'create';
+  const confirmLabelKey = operation === 'update' ? 'automation.confirmUpdate' : 'automation.confirmCreate';
   const initialType = (jobData.type || jobData.scheduleType || 'cron') as string;
   const agents = useStore(s => s.agents);
+  const currentAgentId = useStore(s => s.currentAgentId);
   const fallbackAgentName = useStore(s => s.agentName) || 'Hanako';
   const fallbackAgentYuan = useStore(s => s.agentYuan) || 'hanako';
   const initialPrompt = (jobData.prompt as string) || (block.description as string) || '';
@@ -730,8 +779,12 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
       : typeof block.target?.id === 'string' && block.target.id.trim()
         ? block.target.id.trim()
         : null;
+  const initialAgentId = defaultAutomationAgentId(agents, currentAgentId, draftAgentId);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(initialAgentId);
+  const effectiveAgentId = selectedAgentId || initialAgentId;
+  const selectedAgent = agents.find((agent: any) => agent.id === effectiveAgentId) || null;
   const agentInfo = resolveAgentDisplayInfo({
-    id: draftAgentId,
+    id: effectiveAgentId,
     agents,
     fallbackAgentName,
     fallbackAgentYuan,
@@ -740,6 +793,11 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
   useEffect(() => {
     setStatus(block.status);
   }, [block.status]);
+
+  useEffect(() => {
+    if (effectiveAgentId && agents.some((agent: any) => agent.id === effectiveAgentId)) return;
+    setSelectedAgentId(initialAgentId);
+  }, [agents, effectiveAgentId, initialAgentId]);
 
   useEffect(() => {
     if (!modalOpen) return;
@@ -765,20 +823,43 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
 
   const buildDraftJobData = () => {
     const nextSchedule = storedScheduleFromDraft(scheduleDraft);
+    const baseExecutor = automationRecord(jobData.executor);
+    const model = jobData.model ?? baseExecutor.model ?? '';
+    const executionContext = buildAutomationExecutionContext({
+      agent: selectedAgent,
+      agentId: effectiveAgentId,
+      baseContext: automationRecord(jobData.executionContext || baseExecutor.executionContext),
+      sessionPath,
+    });
     return {
       ...jobData,
       type: nextSchedule.type,
       schedule: nextSchedule.schedule,
       label: draftLabel,
       prompt: draftPrompt,
+      model,
+      actorAgentId: effectiveAgentId,
+      executionContext,
+      executor: {
+        ...baseExecutor,
+        kind: 'agent_session',
+        agentId: effectiveAgentId,
+        prompt: draftPrompt,
+        model,
+        executionContext,
+      },
     };
   };
 
-  const createDraftJob = async (editedJobData: Record<string, unknown>) => {
+  const submitDraftJob = async (editedJobData: Record<string, unknown>) => {
+    const isUpdate = operation === 'update';
+    const { id, ...fields } = editedJobData;
     await hanaFetch('/api/desk/cron', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'add', ...editedJobData }),
+      body: JSON.stringify(isUpdate
+        ? { action: 'update', id, ...fields }
+        : { action: 'add', ...editedJobData }),
     });
   };
 
@@ -800,7 +881,7 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
             throw new Error(`confirm failed: ${res.status}`);
           }
         }
-        if (!createdByConfirm) await createDraftJob(editedJobData);
+        if (!createdByConfirm) await submitDraftJob(editedJobData);
       } else if (block.confirmId) {
         await hanaFetch(`/api/confirm/${block.confirmId}`, {
           method: 'POST',
@@ -808,7 +889,7 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
           body: JSON.stringify({ action: 'confirmed', value: { jobData: editedJobData } }),
         });
       } else {
-        await createDraftJob(editedJobData);
+        await submitDraftJob(editedJobData);
       }
       setStatus('approved');
       setModalOpen(false);
@@ -890,14 +971,49 @@ const CronConfirmBlock = memo(function CronConfirmBlock({ block }: { block: any 
             aria-label={window.t('automation.field.prompt')}
           />
           <div className={styles.automationDraftFooter}>
-            <div className={styles.automationDraftAgentChip}>
-              <AgentAvatar info={agentInfo} className={styles.automationDraftAgentAvatar} />
-              <span>{agentInfo.displayName}</span>
-            </div>
             <ScheduleEditor draft={scheduleDraft} onChange={setScheduleDraft} className={styles.automationDraftSchedule} />
+            <label className={styles.automationDraftField}>
+              <span>{window.t('automation.field.agent')}</span>
+              <SelectWidget
+                className={styles.automationDraftAgentSelect}
+                triggerClassName={styles.automationDraftControlButton}
+                popupClassName={styles.automationDraftAgentPopup}
+                value={effectiveAgentId || ''}
+                options={agents.map((agent: any): SelectOption => ({
+                  value: agent.id,
+                  label: agent.name || agent.id,
+                }))}
+                onChange={(value) => setSelectedAgentId(value)}
+                align="start"
+                placement="top"
+                density="comfortable"
+                renderTrigger={(_option, isOpen) => (
+                  <>
+                    <AgentAvatar info={agentInfo} className={styles.automationDraftAgentAvatar} />
+                    <span className={styles.automationDraftAgentName}>{agentInfo.displayName}</span>
+                    <svg className={styles.automationDraftControlArrow} data-open={isOpen} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M4 6l4 4 4-4" />
+                    </svg>
+                  </>
+                )}
+                renderOption={(option, selected) => {
+                  const info = resolveAgentDisplayInfo({
+                    id: option.value,
+                    agents,
+                    fallbackAgentName: option.label,
+                  });
+                  return (
+                    <span className={styles.automationDraftAgentOption} data-selected={selected}>
+                      <AgentAvatar info={info} className={styles.automationDraftAgentAvatar} />
+                      <span>{info.displayName}</span>
+                    </span>
+                  );
+                }}
+              />
+            </label>
             <div className={styles.automationDraftActions}>
               <button className={styles.automationDraftTextButton} type="button" onClick={handleReject}>{window.t('common.cancel')}</button>
-              <button className={styles.automationDraftPrimaryButton} type="button" onClick={handleApprove}>{window.t('automation.confirmCreate')}</button>
+              <button className={styles.automationDraftPrimaryButton} type="button" onClick={handleApprove}>{window.t(confirmLabelKey)}</button>
             </div>
           </div>
         </div>

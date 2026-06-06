@@ -2146,6 +2146,7 @@
     "openDraft": "打开自动化草稿",
     "closeDraft": "关闭自动化草稿",
     "confirmCreate": "确认添加",
+    "confirmUpdate": "确认修改",
     "defaultModel": "默认模型",
     "add": "添加自动化",
     "enable": "启用",
@@ -2158,6 +2159,7 @@
     "agentRequired": "需要先选择一个 Agent",
     "field": {
       "label": "名称",
+      "agent": "助手",
       "scheduleType": "类型",
       "schedule": "时间",
       "prompt": "执行内容"

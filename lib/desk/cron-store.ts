@@ -387,7 +387,18 @@ export class CronStore {
     if (!job) return null;
     const before = JSON.parse(JSON.stringify(job));
 
-    const ALLOWED = new Set(["label", "model", "schedule", "prompt", "enabled", "type"]);
+    const ALLOWED = new Set([
+      "label",
+      "model",
+      "schedule",
+      "prompt",
+      "enabled",
+      "type",
+      "actorAgentId",
+      "executionContext",
+      "executor",
+      "createdBy",
+    ]);
     const VALID_TYPES = new Set(["at", "every", "cron"]);
     if ("type" in partial && !VALID_TYPES.has(partial.type)) {
       throw new Error(`无效的 job type: "${partial.type}"，必须是 at / every / cron`);
@@ -402,6 +413,29 @@ export class CronStore {
 
       if (key === "model") value = normalizeCronModelRef(value);
       if (key === "type") value = String(value);
+      if (key === "actorAgentId") {
+        if (typeof value === "string" && value.trim()) job.actorAgentId = value.trim();
+        continue;
+      }
+      if (key === "executionContext") {
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          job.executionContext = JSON.parse(JSON.stringify(value));
+        }
+        continue;
+      }
+      if (key === "executor") {
+        validateAutomationExecutorForWrite(value);
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          job.executor = JSON.parse(JSON.stringify(value));
+        }
+        continue;
+      }
+      if (key === "createdBy") {
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          job.createdBy = JSON.parse(JSON.stringify(value));
+        }
+        continue;
+      }
 
       job[key] = value;
     }

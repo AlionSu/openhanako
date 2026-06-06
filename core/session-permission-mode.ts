@@ -30,6 +30,7 @@ const SIDE_EFFECT_TOOLS = new Set([
   "write",
   "edit",
   "computer",
+  "automation",
   "cron",
   "dm",
   "channel",
@@ -61,6 +62,7 @@ const SUBAGENT_BLOCKED_TOOLS = new Set([
   "unpin_memory",
   "record_experience",
   // ③ agent 生命周期 / 对外副作用
+  "automation",
   "cron",
   "channel",
   "dm",

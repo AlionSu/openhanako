@@ -2146,6 +2146,7 @@
     "openDraft": "Open automation draft",
     "closeDraft": "Close automation draft",
     "confirmCreate": "Confirm",
+    "confirmUpdate": "Update",
     "defaultModel": "Default model",
     "add": "Add automation",
     "enable": "Enable",
@@ -2158,6 +2159,7 @@
     "agentRequired": "Choose an Agent first",
     "field": {
       "label": "Name",
+      "agent": "Agent",
       "scheduleType": "Type",
       "schedule": "Time",
       "prompt": "Run prompt"

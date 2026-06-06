@@ -32,6 +32,12 @@ export function applyConfirmedAutomationDraft(baseJobData: unknown, confirmation
   if (typeof draft.label === "string") {
     next.label = draft.label;
   }
+  if (typeof draft.actorAgentId === "string" && draft.actorAgentId.trim()) {
+    next.actorAgentId = draft.actorAgentId.trim();
+  }
+  if (draft.executionContext && typeof draft.executionContext === "object" && !Array.isArray(draft.executionContext)) {
+    next.executionContext = clonePlain(draft.executionContext);
+  }
   if (Object.prototype.hasOwnProperty.call(draft, "model")) {
     next.model = clonePlain(draft.model);
   }
@@ -42,8 +48,8 @@ export function applyConfirmedAutomationDraft(baseJobData: unknown, confirmation
       ...executor,
       prompt: typeof next.prompt === "string" ? next.prompt : "",
       model: clonePlain(next.model ?? executor.model ?? ""),
-      executionContext: clonePlain(base.executionContext ?? executor.executionContext ?? null),
-      agentId: base.actorAgentId || executor.agentId || null,
+      executionContext: clonePlain(next.executionContext ?? executor.executionContext ?? null),
+      agentId: next.actorAgentId || executor.agentId || null,
     };
   }
 

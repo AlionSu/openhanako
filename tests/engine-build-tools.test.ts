@@ -242,14 +242,14 @@ describe("HanaEngine.buildTools", () => {
       { name: "browser", execute: vi.fn() },
       { name: "channel", execute: vi.fn() },
       { name: "dm", execute: vi.fn() },
-      { name: "cron", execute: vi.fn() },
+      { name: "automation", execute: vi.fn() },
     ], {
       agentDir,
       workspace: tmpDir,
       getPermissionMode: () => "operate",
     });
 
-    expect(customTools.map((tool) => tool.name)).toEqual(["cron"]);
+    expect(customTools.map((tool) => tool.name)).toEqual(["automation"]);
   });
 
   it("passes a session workbench execution boundary into plugin tools", async () => {

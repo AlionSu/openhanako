@@ -496,6 +496,69 @@ describe("CronStore updateJob 字段白名单", () => {
     expect(updated.label).toBe("new label");
   });
 
+  it("updateJob 允许确认卡同步变更执行 Agent 归属", () => {
+    const store = makeTmpStore();
+    const job = store.addJob({
+      type: "cron",
+      schedule: "0 9 * * *",
+      prompt: "old prompt",
+      actorAgentId: "agent-a",
+      executionContext: {
+        kind: "session_workspace",
+        cwd: "/home/agent-a",
+        workspaceFolders: [],
+        sourceSessionPath: "/sessions/a.jsonl",
+        createdByAgentId: "agent-a",
+      },
+      executor: {
+        kind: "agent_session",
+        agentId: "agent-a",
+        prompt: "old prompt",
+        model: "",
+        executionContext: {
+          kind: "session_workspace",
+          cwd: "/home/agent-a",
+          workspaceFolders: [],
+          sourceSessionPath: "/sessions/a.jsonl",
+          createdByAgentId: "agent-a",
+        },
+      },
+    } as any);
+
+    const updated = store.updateJob(job.id, {
+      prompt: "new prompt",
+      actorAgentId: "agent-b",
+      executionContext: {
+        kind: "session_workspace",
+        cwd: "/home/agent-b",
+        workspaceFolders: [],
+        sourceSessionPath: "/sessions/a.jsonl",
+        createdByAgentId: "agent-b",
+      },
+      executor: {
+        kind: "agent_session",
+        agentId: "agent-b",
+        prompt: "new prompt",
+        model: "",
+        executionContext: {
+          kind: "session_workspace",
+          cwd: "/home/agent-b",
+          workspaceFolders: [],
+          sourceSessionPath: "/sessions/a.jsonl",
+          createdByAgentId: "agent-b",
+        },
+      },
+    } as any);
+
+    expect(updated.actorAgentId).toBe("agent-b");
+    expect(updated.executionContext.cwd).toBe("/home/agent-b");
+    expect(updated.executor).toMatchObject({
+      kind: "agent_session",
+      agentId: "agent-b",
+      prompt: "new prompt",
+    });
+  });
+
   it("schedule 变更触发 nextRunAt 重算", () => {
     const store = makeTmpStore();
     const job = store.addJob({

@@ -851,31 +851,96 @@
 
 .automationDraftFooter {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(116px, 0.32fr) auto;
     align-items: end;
     gap: var(--space-sm);
     padding-top: var(--space-xs);
 }
 
-.automationDraftAgentChip {
-    min-height: 1.65rem;
-    display: inline-flex;
+.automationDraftField {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+}
+
+.automationDraftAgentSelect {
+    width: 100%;
+    max-width: none;
+}
+
+.automationDraftControlButton {
+    width: 100%;
+    min-width: 0;
+    height: 1.65rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 6px;
-    color: var(--text-muted);
-    font-size: 0.74rem;
-    white-space: nowrap;
+    padding: 0 7px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.72rem;
+    line-height: 1;
+    text-align: left;
+    cursor: default;
+    transition: background var(--duration-fast), border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.automationDraftControlButton:hover {
+    border-color: rgba(var(--accent-rgb), 0.2);
+    background: rgba(var(--accent-rgb), 0.025);
+}
+
+.automationDraftControlButton:focus-visible {
+    outline: none;
+    border-color: rgba(var(--accent-rgb), 0.35);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08);
 }
 
 .automationDraftAgentAvatar {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     object-fit: cover;
 }
 
+.automationDraftAgentName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.automationDraftControlArrow {
+    width: 13px;
+    height: 13px;
+    color: var(--text-muted);
+    transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.automationDraftControlArrow[data-open="true"] {
+    transform: rotate(180deg);
+}
+
+.automationDraftAgentPopup {
+    min-width: 150px;
+}
+
+.automationDraftAgentOption {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
 .automationDraftSchedule {
-    min-width: min(360px, 100%);
+    min-width: 0;
 }
 
 .automationDraftActions {
