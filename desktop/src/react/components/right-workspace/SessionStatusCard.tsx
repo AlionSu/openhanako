@@ -5,6 +5,7 @@
  * 无当前对话时返回 null（welcome 态不显示）。
  */
 import { type MouseEvent, useState } from 'react';
+import { Collapse } from '@/ui';
 import { useStore } from '../../stores';
 import { hanaFetch } from '../../hooks/use-hana-fetch';
 import styles from './SessionStatusCard.module.css';
@@ -91,7 +92,7 @@ export function SessionStatusCard() {
   }
 
   return (
-    <section className={`jian-card ${styles.card}`} aria-label={t('rightWorkspace.session.title')}>
+    <section className={`jian-card ${styles.card}`} aria-label={t('rightWorkspace.session.title')} data-collapsed={collapsed || undefined}>
       <div className={styles.header}>
         <button className={styles.headerToggle} type="button" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed}>
           <span className={styles.title}>{t('rightWorkspace.session.title')}</span>
@@ -120,7 +121,7 @@ export function SessionStatusCard() {
           </button>
         </div>
       </div>
-      {!collapsed && (
+      <Collapse open={!collapsed}>
         <dl className={styles.body}>
           <div className={styles.row}>
             <dt className={styles.label}>{t('rightWorkspace.session.cwd')}</dt>
@@ -139,7 +140,7 @@ export function SessionStatusCard() {
             <dd className={styles.value}>{filesCount}</dd>
           </div>
         </dl>
-      )}
+      </Collapse>
     </section>
   );
 }

@@ -4,6 +4,11 @@
     flex-direction: column;
     padding: var(--space-sm) var(--space-md);
     gap: 6px;
+    transition: gap 0.25s var(--ease-out);
+}
+
+.card[data-collapsed] {
+    gap: 0;
     /* 解禁硬高度上限 + overflow:hidden：原本 40% 截断 + .list 不滚动，导致展开后
        内容被裁、与下方卡重合。改为卡片随内容自然增高，整列滚动交给外层 panel
        （RightWorkspacePanel .shell overflow-y:auto）。节点 preview 自带 3 行滚动（见 .scroll）。 */

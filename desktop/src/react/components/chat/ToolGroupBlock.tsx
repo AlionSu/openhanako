@@ -3,6 +3,7 @@
  */
 
 import { memo, useState, useCallback, useEffect } from 'react';
+import { Collapse } from '@/ui';
 import styles from './Chat.module.css';
 import { extractToolDetail } from '../../utils/message-parser';
 import type { ToolDetail } from '../../utils/message-parser';
@@ -68,11 +69,21 @@ export const ToolGroupBlock = memo(function ToolGroupBlock({ tools: rawTools, co
           )}
         </div>
       )}
-      <div className={`${styles.toolGroupContent}${collapsed && !isSingle ? ` ${styles.toolGroupContentCollapsed}` : ''}`}>
-        {tools.map((tool, i) => (
-          <ToolIndicator key={tool.id || `${tool.name}-${i}`} tool={tool} agentName={agentName} />
-        ))}
-      </div>
+      {isSingle ? (
+        <div className={styles.toolGroupContent}>
+          {tools.map((tool, i) => (
+            <ToolIndicator key={tool.id || `${tool.name}-${i}`} tool={tool} agentName={agentName} />
+          ))}
+        </div>
+      ) : (
+        <Collapse open={!collapsed}>
+          <div className={styles.toolGroupContent}>
+            {tools.map((tool, i) => (
+              <ToolIndicator key={tool.id || `${tool.name}-${i}`} tool={tool} agentName={agentName} />
+            ))}
+          </div>
+        </Collapse>
+      )}
     </div>
   );
 });

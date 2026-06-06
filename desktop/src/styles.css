@@ -373,7 +373,7 @@ html[data-platform="linux"] .tb-toggle-right {
 
 .float-sidebar[data-stage="enter"],
 .float-sidebar[data-stage="exit"] {
-    animation-duration: 0.25s;
+    animation-duration: var(--duration-slow);
     animation-timing-function: var(--ease-smooth);
     animation-fill-mode: forwards;
 }

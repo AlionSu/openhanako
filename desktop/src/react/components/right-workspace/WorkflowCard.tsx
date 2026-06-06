@@ -8,6 +8,7 @@
  * 节点行（workflow_step）：几何形状图标 + 名，不可展开。
  */
 import { useEffect, useRef, useState } from 'react';
+import { Collapse } from '@/ui';
 import { useStore } from '../../stores';
 import { selectAgentActivities, type AgentActivityEntry } from '../../stores/agent-activity-slice';
 import { AgentAvatar, resolveAgentDisplayInfo } from '../../utils/agent-display';
@@ -120,19 +121,21 @@ function WorkflowNodeRow({ node, agents, open, onToggle }: {
         <span className={styles.nodeName} title={displayName}>{displayName}</span>
         {tokenText && <span className={styles.nodeTokens}>{tokenText}</span>}
       </button>
-      {!isStep && open && (
-        <div className={styles.details}>
-          <div ref={scrollRef} className={styles.scroll}>
-            <SubagentSessionPreview
-              taskId={node.id}
-              sessionPath={node.childSessionPath}
-              agentId={node.agentId}
-              streamStatus={node.status}
-              summary={node.summary}
-              scrollContainerRef={scrollRef}
-            />
+      {!isStep && (
+        <Collapse open={open}>
+          <div className={styles.details}>
+            <div ref={scrollRef} className={styles.scroll}>
+              <SubagentSessionPreview
+                taskId={node.id}
+                sessionPath={node.childSessionPath}
+                agentId={node.agentId}
+                streamStatus={node.status}
+                summary={node.summary}
+                scrollContainerRef={scrollRef}
+              />
+            </div>
           </div>
-        </div>
+        </Collapse>
       )}
     </div>
   );
@@ -189,7 +192,7 @@ function PhaseSection({ phaseLabel, nodes, agents, expandedNodes, onToggleNode }
           <span className={styles.phaseCount}>{doneCount}/{total}</span>
         </button>
       )}
-      {(open || !phaseLabel) && (
+      <Collapse open={open || !phaseLabel}>
         <div className={styles.phaseNodes}>
           {nodes.map((n) => (
             <WorkflowNodeRow
@@ -201,7 +204,7 @@ function PhaseSection({ phaseLabel, nodes, agents, expandedNodes, onToggleNode }
             />
           ))}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -232,7 +235,7 @@ function WorkflowRow({ wf, nodes, agents, now, open, onToggle, expandedNodes, on
         {totalTokens > 0 && <span className={styles.tokenSum}>{formatTokens(totalTokens)}</span>}
         {dur && <span className={styles.duration}>{dur}</span>}
       </button>
-      {open && nodes.length > 0 && (
+      <Collapse open={open && nodes.length > 0}>
         <div className={styles.nodeList}>
           {phases.map((group) => (
             <PhaseSection
@@ -246,7 +249,7 @@ function WorkflowRow({ wf, nodes, agents, now, open, onToggle, expandedNodes, on
             />
           ))}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -285,13 +288,13 @@ export function WorkflowCard() {
       .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
 
   return (
-    <section className={`jian-card ${styles.card}`} aria-label="Workflow">
+    <section className={`jian-card ${styles.card}`} aria-label="Workflow" data-collapsed={collapsed || undefined}>
       <button className={styles.header} type="button" onClick={() => setCollapsed((c) => !c)} aria-expanded={!collapsed}>
         <span className={styles.title}>{t('rightWorkspace.workflow.title')}</span>
         <span className={styles.count}>{sorted.length}</span>
         <Chevron open={!collapsed} />
       </button>
-      {!collapsed && (
+      <Collapse open={!collapsed}>
         <div className={styles.list}>
           {sorted.map((wf) => (
             <WorkflowRow
@@ -307,7 +310,7 @@ export function WorkflowCard() {
             />
           ))}
         </div>
-      )}
+      </Collapse>
     </section>
   );
 }

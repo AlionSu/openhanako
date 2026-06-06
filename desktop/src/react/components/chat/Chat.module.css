@@ -438,7 +438,7 @@
 }
 
 .streamTailChar {
-    animation: stream-tail-fade 180ms var(--ease-out) both;
+    animation: stream-tail-fade var(--duration-fast) var(--ease-out) both;
     animation-delay: calc(var(--stream-tail-index, 0) * 14ms);
     will-change: opacity;
 }
@@ -952,10 +952,6 @@
 
 .toolGroupContent {
     padding: 0 0.75rem 0.3rem;
-}
-
-.toolGroupContentCollapsed {
-    display: none;
 }
 
 /* 单条工具时隐藏标题行 */
