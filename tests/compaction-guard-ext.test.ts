@@ -247,6 +247,55 @@ describe("CompactionGuardExtension", () => {
       expect(computeHardTruncation).not.toHaveBeenCalled();
     });
 
+    it("falls back to Pi SDK native compaction when auto cache-preserving compaction fails", async () => {
+      pi = createMockPi();
+      const failingCompactor = vi.fn(async () => {
+        throw new Error("cache prefix mismatch");
+      });
+      createCompactionGuardExtension({
+        cacheCompactor: failingCompactor,
+        buildSessionCacheSnapshot,
+        getCompactionMode: () => "auto",
+      })(pi);
+      (estimatePreparationTokens as any).mockReturnValue(50_000);
+
+      const res = await pi.trigger(
+        "session_before_compact",
+        { preparation, signal: { aborted: false } },
+        ctx,
+      );
+
+      expect(res).toBeUndefined();
+      expect(failingCompactor).toHaveBeenCalledOnce();
+      expect(buildSessionCacheSnapshot).toHaveBeenCalledWith("/sessions/current.jsonl", expect.objectContaining({
+        reason: "compaction.history",
+        messages: preparation.messagesToSummarize,
+      }));
+      expect(computeHardTruncation).not.toHaveBeenCalled();
+    });
+
+    it("cancels instead of falling back when explicit cache-preserving mode fails", async () => {
+      pi = createMockPi();
+      const failingCompactor = vi.fn(async () => {
+        throw new Error("cache prefix mismatch");
+      });
+      createCompactionGuardExtension({
+        cacheCompactor: failingCompactor,
+        buildSessionCacheSnapshot,
+        getCompactionMode: () => "cache_preserving",
+      })(pi);
+      (estimatePreparationTokens as any).mockReturnValue(50_000);
+
+      const res = await pi.trigger(
+        "session_before_compact",
+        { preparation, signal: { aborted: false } },
+        ctx,
+      );
+
+      expect(res).toEqual({ cancel: true });
+      expect(failingCompactor).toHaveBeenCalledOnce();
+    });
+
     it("strips inline media from compaction preparation before estimating or snapshotting history", async () => {
       (estimatePreparationTokens as any).mockReturnValue(50_000);
       const mediaPreparation = {
