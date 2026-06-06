@@ -1,6 +1,7 @@
 ---
 name: hana-plugin-creator
 description: Create Hana plugin scaffolds and guide users through beginner or developer plugin planning, capability checks, manifest setup, runtime tools, iframe UI, SDK templates, and install-ready plugin directories. Use when HanaAgent/Codex needs to explain what Hana plugins can do, help a user describe a plugin idea, check whether the SDK supports it, or generate/update a Hana plugin with @hana/plugin-runtime, @hana/plugin-sdk, and @hana/plugin-components.
+compatibility: "Uses a bundled Node preflight plus a Python scaffold script. No third-party Python packages are required."
 metadata:
   default-enabled: false
 ---
@@ -44,6 +45,22 @@ Hana plugins can provide:
 Hana provides install/enable/reload, per-agent skill toggles, manifest capability checks, iframe host messaging, theme tokens, toast/clipboard/external host APIs, EventBus, data directories, and SDK packages.
 
 Current boundaries: iframe UI is the stable extension surface. Native renderer components and code sandboxing are not the default path yet. If a request depends on those, explain the gap and propose the closest supported shape.
+
+## Environment Preflight
+
+Run the bundled Node preflight before invoking the Python scaffold script:
+
+```bash
+node skills2set/hana-plugin-creator/scripts/check_env.mjs --capability scaffold
+```
+
+Behavior:
+
+- The preflight itself is JavaScript and uses only Node built-ins.
+- It finds Python through `HANA_PLUGIN_CREATOR_PYTHON`, `python3`, `python`, or Windows `py -3`.
+- It requires Python 3.10+ because the scaffold script uses modern Python syntax.
+- If it returns `ok: false`, stop and show the user the `message` or `installGuidance`. Do not auto-install dependencies.
+- Use the same Python command that passed preflight for the scaffold examples below. The examples use `python3`.
 
 ## Workflow
 
