@@ -1231,7 +1231,7 @@
       "totalTokens": "총 Tokens",
       "cacheRead": "캐시 읽기",
       "cacheHitRate": "히트율",
-      "estimatedCost": "예상 비용",
+
       "uncached": "비캐시 사용",
       "modelMix": "모델 분포",
       "dailyUsage": "일별 사용량",

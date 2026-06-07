@@ -1231,7 +1231,7 @@
       "totalTokens": "合計 Tokens",
       "cacheRead": "キャッシュ読込",
       "cacheHitRate": "ヒット率",
-      "estimatedCost": "推定コスト",
+
       "uncached": "非キャッシュ",
       "modelMix": "モデル分布",
       "dailyUsage": "日別使用量",

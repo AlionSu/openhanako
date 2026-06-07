@@ -1363,7 +1363,7 @@
       "totalTokens": "Tokens",
       "cacheRead": "缓存命中",
       "cacheHitRate": "命中率",
-      "estimatedCost": "预估成本",
+
       "uncached": "未缓存消耗",
       "modelMix": "模型分布",
       "dailyUsage": "每日用量",

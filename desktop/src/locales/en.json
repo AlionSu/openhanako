@@ -1363,7 +1363,7 @@
       "totalTokens": "Total tokens",
       "cacheRead": "Cache read",
       "cacheHitRate": "Hit rate",
-      "estimatedCost": "Estimated cost",
+
       "uncached": "Uncached",
       "modelMix": "Model mix",
       "dailyUsage": "Daily usage",
