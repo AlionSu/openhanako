@@ -1527,7 +1527,7 @@ function resolveQuickChatWindowBounds(mode, state = loadQuickChatWindowState(), 
   return {
     x: sanitized.x,
     y: sanitized.y,
-    width: Math.max(QUICK_CHAT_MIN_WIDTH, Math.min(QUICK_CHAT_WIDTH, sanitized.width || QUICK_CHAT_WIDTH)),
+    width: Math.max(QUICK_CHAT_MIN_WIDTH, sanitized.width || QUICK_CHAT_WIDTH),
     height: sanitized.height || height,
   };
 }
@@ -1543,8 +1543,8 @@ function saveQuickChatWindowState() {
     const state = {
       x: bounds.x,
       y: bounds.y,
-      width: QUICK_CHAT_WIDTH,
-      height: quickChatHeightForMode(quickChatMode),
+      width: bounds.width,
+      height: bounds.height,
     };
     _saveQuickChatWindowStateChain = _saveQuickChatWindowStateChain.then(async () => {
       await fs.promises.mkdir(path.dirname(quickChatWindowStatePath), { recursive: true });
@@ -1571,8 +1571,23 @@ function normalizeQuickChatResizeRequest(request) {
 function applyQuickChatMode(request) {
   if (!quickChatWindow || quickChatWindow.isDestroyed()) return;
   const { mode, height } = normalizeQuickChatResizeRequest(request);
+  const prevMode = quickChatMode;
   quickChatMode = mode;
   const bounds = resolveQuickChatWindowBounds(quickChatMode, quickChatWindow.getBounds(), height);
+
+  if (mode === "chat") {
+    // chat 模式：允许用户手动调整大小，且只增不缩（尊重用户手动拉大的尺寸）
+    const currentBounds = quickChatWindow.getBounds();
+    if (prevMode === "chat") {
+      bounds.height = Math.max(bounds.height, currentBounds.height);
+      bounds.width = Math.max(bounds.width, currentBounds.width);
+    }
+    quickChatWindow.setResizable(true);
+  } else {
+    // compact 模式：固定大小
+    quickChatWindow.setResizable(false);
+  }
+
   quickChatWindow.setBounds(bounds, true);
   saveQuickChatWindowState();
 }
@@ -1587,7 +1602,6 @@ function createQuickChatWindow() {
     ...bounds,
     minWidth: QUICK_CHAT_MIN_WIDTH,
     minHeight: QUICK_CHAT_MIN_HEIGHT,
-    maxWidth: QUICK_CHAT_WIDTH,
     resizable: false,
     maximizable: false,
     fullscreenable: false,

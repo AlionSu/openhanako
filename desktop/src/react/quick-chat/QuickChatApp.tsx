@@ -629,11 +629,24 @@ export function QuickChatApp() {
     window.hana?.quickChatResize?.({ mode, height });
   }, [attachments.length, displayError, draft, expanded, sessionItems, isStreaming]);
 
+  const isNearBottomRef = useRef(true);
+
   useEffect(() => {
     const scroller = transcriptScrollRef.current;
     if (!scroller) return;
+    const handleScroll = () => {
+      const threshold = 48;
+      isNearBottomRef.current = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - threshold;
+    };
+    scroller.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scroller.removeEventListener('scroll', handleScroll);
+  }, [expanded]);
+
+  useEffect(() => {
+    const scroller = transcriptScrollRef.current;
+    if (!scroller || !isNearBottomRef.current) return;
     scroller.scrollTop = scroller.scrollHeight;
-  }, [sessionItems, isStreaming, draft]);
+  }, [sessionItems, isStreaming]);
 
   return (
     <div

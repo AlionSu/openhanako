@@ -400,6 +400,16 @@ export async function switchSession(path: string): Promise<void> {
       }));
     }
 
+    // 在设置 currentSessionPath 之前预加载消息历史。
+    // 一旦 currentSessionPath 指向新 session，主窗口 WebSocket 会将该 session 的流式事件
+    // 路由到 streamBufferManager，触发 bumpMessageLiveVersion，导致 loadMessages 的
+    // 竞态守卫跳过 hydrate，store 丢失完整历史。提前加载可避免此竞态。
+    const hasData = !!useStore.getState().chatSessions?.[path];
+    if (!hasData) {
+      await loadMessages(path);
+      if (myVersion !== _switchVersion) return;
+    }
+
     // 批量更新 store（切 currentSessionPath 切换对话内容；可见 desk/preview 状态由 workspace 激活流程恢复）
     useStore.setState({
       currentSessionPath: path,
@@ -470,13 +480,6 @@ export async function switchSession(path: string): Promise<void> {
         xhigh: data.currentModelXhigh ?? undefined,
         contextWindow: data.currentModelContextWindow ?? undefined,
       });
-    }
-
-    // 如果 store 中没有该 session 的消息数据，加载之
-    const hasData = !!useStore.getState().chatSessions?.[path];
-    if (!hasData) {
-      await loadMessages(path);
-      if (myVersion !== _switchVersion) return;
     }
 
     await requestActiveSessionStreamResume(path, isStreaming);
