@@ -1332,30 +1332,33 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     setFileMentionQuery('');
   }, [editor, fileMentionRange, inputLocked]);
 
-  // ── Send message ──
-  const handleSend = useCallback(async () => {
+  // ── Send / interject message ──
+  const submitEditorMessage = useCallback(async (type: 'prompt' | 'interject') => {
     if (inputLocked) return;
     if (!editor) return;
     const editorJson = editor.getJSON();
     const { text: rawText, skills, fileRefs } = serializeEditor(editorJson);
     const text = rawText.trim();
 
-    const slashSelection = resolveSlashSubmitSelection({
-      text,
-      skills,
-      commands: slashCommands,
-      selectedIndex: slashSelected,
-      dismissedText: slashDismissedTextRef.current,
-    });
-    if (slashSelection) {
-      handleSlashSelect(slashSelection);
-      return;
+    if (type === 'prompt') {
+      const slashSelection = resolveSlashSubmitSelection({
+        text,
+        skills,
+        commands: slashCommands,
+        selectedIndex: slashSelected,
+        dismissedText: slashDismissedTextRef.current,
+      });
+      if (slashSelection) {
+        handleSlashSelect(slashSelection);
+        return;
+      }
     }
 
     const inputFiles = mergeEditorFileRefs(attachedFiles, fileRefs);
     const hasFiles = inputFiles.length > 0;
     if ((!text && !hasFiles && !docContextAttached && useStore.getState().quotedSelections.length === 0) || !connected) return;
-    if (isStreaming) return;
+    if (type === 'prompt' && isStreaming) return;
+    if (type === 'interject' && !isStreaming) return;
     if (sending) return;
     if (modelSwitching) return;
     if (useStore.getState().pendingSessionSwitchPath) return;
@@ -1533,7 +1536,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
 
       const ws = getWebSocket();
       const wsMsg: Record<string, unknown> = {
-        type: 'prompt',
+        type,
         text: finalText,
         sessionPath: sessionPathForSend,
         uiContext: collectUiContext(useStore.getState()),
@@ -1569,27 +1572,14 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     }
   }, [editor, inputLocked, attachedFiles, docContextAttached, connected, isStreaming, sending, pendingNewSession, currentDoc, clearAttachedFiles, clearDraft, currentSessionPath, setDocContextAttached, slashCommands, slashSelected, handleSlashSelect, supportsVision, currentModelInfo, loadVisionAuxiliaryConfig, modelSwitching, t]);
 
+  const handleSend = useCallback(async () => {
+    await submitEditorMessage('prompt');
+  }, [submitEditorMessage]);
+
   // ── Steer ──
   const handleSteer = useCallback(async () => {
-    if (inputLocked) return;
-    if (!editor) return;
-    const text = editor.getText().trim();
-    if (!text || !isStreaming) return;
-    const ws = getWebSocket();
-    if (!ws) return;
-    const sessionPath = useStore.getState().currentSessionPath;
-    if (sessionPath) {
-      const { renderMarkdown } = await import('../utils/markdown');
-      useStore.getState().appendItem(sessionPath, {
-        type: 'message',
-        data: { id: `user-${Date.now()}`, role: 'user', text, textHtml: renderMarkdown(text), timestamp: Date.now() },
-      });
-    }
-    editor.commands.clearContent();
-    const sp = useStore.getState().currentSessionPath;
-    if (sp) clearDraft(sp);
-    ws.send(JSON.stringify({ type: 'steer', text, sessionPath: sp }));
-  }, [editor, inputLocked, isStreaming, clearDraft]);
+    await submitEditorMessage('interject');
+  }, [submitEditorMessage]);
 
   // ── Stop ──
   const handleStop = useCallback(() => {
@@ -1641,7 +1631,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     }
     if (e.key === 'Enter' && !e.shiftKey && !isComposing.current && !e.isComposing) {
       e.preventDefault();
-      if (isStreaming && (editor?.getText().trim())) handleSteer(); else handleSend();
+      if (isStreaming && hasContent) handleSteer(); else handleSend();
       return true;
     }
     return false;
@@ -1657,6 +1647,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
     handleSteer,
     handleSlashSelect,
     isStreaming,
+    hasContent,
     inputLocked,
     editor,
     slashMenuOpen,
@@ -1785,7 +1776,7 @@ function InputAreaInner({ surface }: Required<InputAreaProps>) {
             models={models}
             sessionModel={sessionModel}
             isStreaming={isStreaming}
-            hasInput={!!inputText.trim()}
+            hasInput={hasContent}
             canSend={canSend}
             showAudioInput={showAudioInput}
             audioRecordingActive={audioRecordingState === 'recording'}
