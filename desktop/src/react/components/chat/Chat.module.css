@@ -1226,8 +1226,9 @@
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     background: var(--tool-bg);
     overflow: hidden;
-    width: fit-content;
+    width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
     animation: hana-chat-soft-down-in 110ms var(--ease-out) both;
 }
 
@@ -1290,6 +1291,11 @@
 
 .processFoldMessage {
     width: 100%;
+}
+
+.processFoldCollapse {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .processFoldSummary {
