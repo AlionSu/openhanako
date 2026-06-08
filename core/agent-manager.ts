@@ -148,6 +148,20 @@ export class AgentManager {
   /** 清除 listAgents 缓存（agent 增删改时调用） */
   invalidateAgentListCache() { this._agentListCache = null; }
 
+  /** 重建所有已初始化 agent 的 _systemPrompt（花名册变更时调用） */
+  _rebuildAllAgentSystemPrompts() {
+    for (const [id, agent] of this._agents) {
+      if (!agent.runtimeInitialized) continue;
+      try {
+        agent._systemPrompt = agent.buildSystemPrompt({
+          forceMemoryEnabled: agent._memoryMasterEnabled,
+        });
+      } catch (err) {
+        log.warn(`rebuild systemPrompt for ${id} failed: ${err?.message || err}`);
+      }
+    }
+  }
+
   get agents() { return this._agents; }
   get activeAgentId() { return this._activeAgentId; }
   set activeAgentId(id) { this._activeAgentId = id; }
@@ -698,6 +712,7 @@ export class AgentManager {
     }
 
     this.invalidateAgentListCache();
+    this._rebuildAllAgentSystemPrompts();
     log.log(`创建助手: ${name} (${agentId})`);
     return { id: agentId, name: name.trim() };
   }
@@ -878,6 +893,7 @@ export class AgentManager {
     }
 
     this.invalidateAgentListCache();
+    this._rebuildAllAgentSystemPrompts();
     log.log(`已删除助手: ${agentId}`);
   }
 
