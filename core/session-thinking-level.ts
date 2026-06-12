@@ -9,6 +9,8 @@ const OPENAI_XHIGH_MODEL_MARKERS = [
   "gpt-5.5",
 ];
 const ANTHROPIC_MAX_EFFORT_MODEL_MARKERS = [
+  "fable-5",
+  "mythos-5",
   "opus-4-6",
   "opus-4.6",
   "opus-4-7",

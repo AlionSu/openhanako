@@ -27,6 +27,8 @@ describe("session thinking level capabilities", () => {
       { id: "claude-opus-4-7", provider: "anthropic", reasoning: true },
       { id: "claude-opus-4-6", provider: "anthropic", reasoning: true },
       { id: "claude-sonnet-4-6", provider: "anthropic", reasoning: true },
+      { id: "claude-fable-5", provider: "anthropic", reasoning: true },
+      { id: "claude-mythos-5", provider: "anthropic", reasoning: true },
       { id: "anthropic/claude-opus-4-7", provider: "vercel-ai-gateway", api: "anthropic-messages", reasoning: true },
     ];
 
@@ -46,6 +48,19 @@ describe("session thinking level capabilities", () => {
     };
 
     expect(modelSupportsAnthropicMaxEffort(model)).toBe(false);
+  });
+
+  it("allows unified Max for OpenRouter Claude Fable without using Anthropic Messages effort control", () => {
+    const model = {
+      id: "anthropic/claude-fable-5",
+      provider: "openrouter",
+      api: "openai-completions",
+      reasoning: true,
+    };
+
+    expect(modelSupportsXhigh(model)).toBe(true);
+    expect(modelSupportsAnthropicMaxEffort(model)).toBe(false);
+    expect(normalizeThinkingLevelForModel("xhigh", model)).toBe("xhigh");
   });
 
   it("resolves model-level thinking defaults with per-model xhigh capability", () => {

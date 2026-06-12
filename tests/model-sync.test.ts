@@ -47,6 +47,17 @@ const KNOWN_MODELS = {
   zhipu: {
     "glm-4.7-flash": { name: "GLM-4.7 Flash", context: 200000, maxOutput: 128000, reasoning: true },
   },
+  anthropic: {
+    "claude-fable-5": {
+      name: "Claude Fable 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+      xhigh: true,
+      compat: { thinkingFormat: "anthropic", reasoningProfile: "anthropic-adaptive-only" },
+    },
+  },
   openai: {
     "gpt-4o": {
       name: "GPT-4o",
@@ -117,6 +128,15 @@ const KNOWN_MODELS = {
     },
   },
   openrouter: {
+    "anthropic/claude-fable-5": {
+      name: "Anthropic/Claude Fable 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+      xhigh: true,
+      compat: { thinkingFormat: "openrouter", reasoningProfile: "openrouter-anthropic-adaptive" },
+    },
     "deepseek/deepseek-v3.2": {
       name: "Deepseek/Deepseek V3.2",
       context: 163840,
@@ -886,6 +906,66 @@ describe("syncModels", () => {
       },
     });
     expect(mimo.compat).not.toHaveProperty("reasoningProfile");
+  });
+
+  it("projects Claude Fable adaptive-only profile for Anthropic Messages providers", async () => {
+    const syncModels = await loadSync();
+
+    const providers = {
+      anthropic: {
+        base_url: "https://api.anthropic.com",
+        api: "anthropic-messages",
+        api_key: "sk-test",
+        models: ["claude-fable-5"],
+      },
+    };
+
+    syncModels(providers, { modelsJsonPath });
+
+    const result = JSON.parse(fs.readFileSync(modelsJsonPath, "utf-8"));
+    const model = result.providers.anthropic.models[0];
+    expect(model).toMatchObject({
+      id: "claude-fable-5",
+      contextWindow: 1000000,
+      maxTokens: 128000,
+      input: ["text", "image"],
+      reasoning: true,
+      compat: {
+        supportsDeveloperRole: false,
+        thinkingFormat: "anthropic",
+        reasoningProfile: "anthropic-adaptive-only",
+      },
+    });
+  });
+
+  it("projects Claude Fable OpenRouter profile without Anthropic Messages fields", async () => {
+    const syncModels = await loadSync();
+
+    const providers = {
+      openrouter: {
+        base_url: "https://openrouter.ai/api/v1",
+        api: "openai-completions",
+        api_key: "sk-test",
+        models: ["anthropic/claude-fable-5"],
+      },
+    };
+
+    syncModels(providers, { modelsJsonPath });
+
+    const result = JSON.parse(fs.readFileSync(modelsJsonPath, "utf-8"));
+    const model = result.providers.openrouter.models[0];
+    expect(model).toMatchObject({
+      id: "anthropic/claude-fable-5",
+      contextWindow: 1000000,
+      maxTokens: 128000,
+      input: ["text", "image"],
+      reasoning: true,
+      compat: {
+        supportsDeveloperRole: false,
+        thinkingFormat: "openrouter",
+        reasoningProfile: "openrouter-anthropic-adaptive",
+      },
+    });
   });
 
   it("writes Pi-loadable models when Hana video capability is enabled", async () => {

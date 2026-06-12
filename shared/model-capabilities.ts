@@ -86,9 +86,11 @@ const MODEL_THINKING_FORMATS = new Set([
 ]);
 
 const MODEL_REASONING_PROFILES = new Set([
+  "anthropic-adaptive-only",
   "deepseek-v4-anthropic",
   "deepseek-v4-openai",
   "mimo-openai",
+  "openrouter-anthropic-adaptive",
   "zhipu-openai",
 ]);
 
@@ -130,6 +132,13 @@ function isOfficialZhipuEndpoint(model: any, context: any = {}) {
 
 function isDeepSeekV4ModelId(id: string): boolean {
   return id === "deepseek-v4" || id.startsWith("deepseek-v4-") || id.startsWith("deepseek-v4.");
+}
+
+function isAnthropicAdaptiveOnlyModelId(id: string): boolean {
+  return id === "claude-fable-5"
+    || id === "claude-mythos-5"
+    || id === "anthropic/claude-fable-5"
+    || id === "anthropic/claude-mythos-5";
 }
 
 function isDeepSeekThinkingModelId(id: string): boolean {
@@ -257,7 +266,22 @@ export function getReasoningProfile(model: any, context: any = {}) {
   const explicit = lower(model.compat?.reasoningProfile || model.compat?.thinkingProfile);
   if (explicit) return explicit;
 
-  if (isOpenRouterEndpoint(model, context)) return null;
+  const modelId = getModelId(model, context);
+
+  if (isOpenRouterEndpoint(model, context)) {
+    if (model.reasoning === true && isAnthropicAdaptiveOnlyModelId(modelId)) {
+      return "openrouter-anthropic-adaptive";
+    }
+    return null;
+  }
+
+  if (
+    model.reasoning === true
+    && isAnthropicAdaptiveOnlyModelId(modelId)
+    && getThinkingFormat(model, context) === "anthropic"
+  ) {
+    return "anthropic-adaptive-only";
+  }
 
   if (isOfficialMimoEndpoint(model, context) && model.reasoning === true) {
     const api = getApi(model, context);
@@ -274,7 +298,6 @@ export function getReasoningProfile(model: any, context: any = {}) {
   }
 
   if (isOfficialDeepSeekEndpoint(model, context)) {
-    const modelId = getModelId(model, context);
     if (!isDeepSeekV4ModelId(modelId)) return null;
 
     const api = getApi(model, context);

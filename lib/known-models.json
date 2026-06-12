@@ -1724,6 +1724,11 @@
       "maxOutput": 128000,
       "image": true,
       "reasoning": true,
+      "xhigh": true,
+      "compat": {
+        "thinkingFormat": "anthropic",
+        "reasoningProfile": "anthropic-adaptive-only"
+      },
       "visionCapabilities": {
         "grounding": true,
         "boxes": true,
@@ -1740,6 +1745,11 @@
       "maxOutput": 128000,
       "image": true,
       "reasoning": true,
+      "xhigh": true,
+      "compat": {
+        "thinkingFormat": "anthropic",
+        "reasoningProfile": "anthropic-adaptive-only"
+      },
       "visionCapabilities": {
         "grounding": true,
         "boxes": true,
@@ -5465,6 +5475,18 @@
       "maxOutput": 128000,
       "image": true,
       "reasoning": true
+    },
+    "anthropic/claude-fable-5": {
+      "name": "Anthropic/Claude Fable 5",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "image": true,
+      "reasoning": true,
+      "xhigh": true,
+      "compat": {
+        "thinkingFormat": "openrouter",
+        "reasoningProfile": "openrouter-anthropic-adaptive"
+      }
     },
     "anthropic/claude-sonnet-4.5": {
       "name": "Anthropic/Claude Sonnet 4.5",

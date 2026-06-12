@@ -64,6 +64,11 @@ describe("known-models dictionary", () => {
       maxOutput: 128000,
       image: true,
       reasoning: true,
+      xhigh: true,
+      compat: {
+        thinkingFormat: "anthropic",
+        reasoningProfile: "anthropic-adaptive-only",
+      },
     });
     expect(lookupKnown("anthropic", "claude-mythos-5")).toMatchObject({
       name: "Claude Mythos 5",
@@ -71,6 +76,31 @@ describe("known-models dictionary", () => {
       maxOutput: 128000,
       image: true,
       reasoning: true,
+      xhigh: true,
+      compat: {
+        thinkingFormat: "anthropic",
+        reasoningProfile: "anthropic-adaptive-only",
+      },
+    });
+    expect(lookupKnown("openrouter", "anthropic/claude-fable-5")).toMatchObject({
+      name: "Anthropic/Claude Fable 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+      xhigh: true,
+      compat: {
+        thinkingFormat: "openrouter",
+        reasoningProfile: "openrouter-anthropic-adaptive",
+      },
+    });
+    expect(lookupKnown("unknown-provider", "anthropic/claude-mythos-5")).toMatchObject({
+      name: "Claude Mythos 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+      xhigh: true,
     });
     expect(lookupKnown("dashscope", "qwen3.6-plus")).toMatchObject({
       context: 1000000,
