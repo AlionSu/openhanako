@@ -248,4 +248,55 @@ describe('ProvidersTab provider-scoped form state', () => {
       },
     });
   });
+
+  it('keeps configured custom providers above setup entries in the API group', async () => {
+    const mixedSummary = {
+      deepseek: providerSummary({
+        display_name: 'DeepSeek',
+        base_url: 'https://api.deepseek.com',
+        has_credentials: true,
+        models: ['deepseek-chat'],
+      }),
+      baichuan: providerSummary({
+        display_name: 'Baichuan',
+        base_url: 'https://api.baichuan-ai.com/v1',
+        is_configured: false,
+      }),
+      'my-proxy': providerSummary({
+        display_name: 'My Proxy',
+        base_url: 'https://proxy.example.com/v1',
+        has_credentials: true,
+        models: ['proxy-chat'],
+        can_delete: true,
+      }),
+    };
+
+    mocks.hanaFetch.mockImplementation((path: string) => {
+      if (path === '/api/providers/summary') {
+        return Promise.resolve(jsonResponse({ providers: mixedSummary }));
+      }
+      return Promise.resolve(jsonResponse({ ok: true }));
+    });
+    useSettingsStore.setState({
+      providersSummary: mixedSummary,
+      selectedProviderId: null,
+      settingsConfig: {
+        providers: {
+          deepseek: { api_key: 'deepseek-key' },
+          'my-proxy': { api_key: 'proxy-key' },
+        },
+      },
+    });
+
+    render(<ProvidersTab />);
+
+    const customButton = await screen.findByRole('button', { name: /My Proxy/ });
+    const unregisteredPresetButton = screen.getByRole('button', { name: /Groq/ });
+    const registrySetupButton = screen.getByRole('button', { name: /Baichuan/ });
+
+    expect(customButton.compareDocumentPosition(unregisteredPresetButton) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(customButton.compareDocumentPosition(registrySetupButton) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+  });
 });

@@ -124,10 +124,10 @@ export function ProvidersTab() {
             )}
 
             <div className={styles['pv-list-group-label']}>API</div>
+            {customProviders.map(renderRegistered)}
             {presetProviders.map(renderRegistered)}
             {unregisteredApiPresets.map(renderUnregistered)}
             {registryOnlyApiProviders.map(renderRegistrySetup)}
-            {customProviders.map(renderRegistered)}
 
             <AddCustomButton onClick={() => setAddingProvider(true)} />
           </div>
