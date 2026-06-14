@@ -54,8 +54,10 @@ import {
   repairSessionInlineMediaEntriesInFile,
 } from "./session-inline-media-prune.ts";
 import {
+  flushSessionManagerSnapshot,
   repairOversizedSessionEntries,
   repairOversizedSessionEntriesInFile,
+  schedulePreAssistantSessionManagerFlush,
 } from "./session-jsonl-file.ts";
 import { createVisionContextInjectionExtension } from "./vision-context-injector.ts";
 import {
@@ -1068,6 +1070,7 @@ export class SessionCoordinator {
     const sessionPath = session.sessionManager?.getSessionFile?.();
     sessionPathRef.current = sessionPath || sessionPathRef.current || null;
     targetModelRef.current = resolvedModel || targetModelRef.current || null;
+    flushSessionManagerSnapshot(session.sessionManager);
     this._session = session;
     this._currentSessionPath = sessionPath || null;
     this._sessionStarted = false;
@@ -1092,6 +1095,12 @@ export class SessionCoordinator {
     }
     const creatingAgentId = ownerAgentId;
     const unsub = session.subscribe((event) => {
+      if (
+        event?.type === "message_end"
+        && event.message?.role !== "assistant"
+      ) {
+        schedulePreAssistantSessionManagerFlush(session.sessionManager);
+      }
       recordAssistantUsage({
         ledger: this._d.getUsageLedger?.(),
         event,
