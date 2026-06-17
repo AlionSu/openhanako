@@ -385,11 +385,6 @@ export async function loadDeskFiles(subdir?: string, overrideDir?: string | null
   } catch (err) {
     console.error('[jian-desk] load failed:', err);
     if (myVersion !== _deskLoadVersion) return;
-    const st = useStore.getState();
-    st.setDeskFiles([]);
-    st.setDeskCurrentPath('');
-    st.setDeskTreeFiles('', []);
-    st.setDeskJianContent(null);
     updateDeskContextBtn();
   }
 }
@@ -534,7 +529,6 @@ export async function loadDeskTreeFiles(subdir = '', options: { force?: boolean;
   } catch (err) {
     console.error('[desk-tree] load failed:', err);
     if (_deskTreeLoadVersion.get(key) !== myVersion) return;
-    useStore.getState().setDeskTreeFiles(normalizedSubdir, []);
   }
 }
 

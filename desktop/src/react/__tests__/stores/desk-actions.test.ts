@@ -151,6 +151,40 @@ describe('desk-actions workspace roots', () => {
     expect(useStore.getState().deskWorkspaceNativeRoot).toBe('/Users/me/docs');
   });
 
+  it('keeps the visible mounted workspace files when a refresh fails', async () => {
+    const existingFiles = [{ name: 'existing.md', isDir: false }];
+    useStore.setState({
+      deskBasePath: 'studio:mount_docs',
+      deskWorkspaceMountId: 'mount_docs',
+      deskWorkspaceLabel: 'Docs',
+      deskFiles: existingFiles,
+      deskTreeFilesByPath: { '': existingFiles },
+    } as never);
+    mockHanaFetch.mockResolvedValueOnce(jsonResponse({ error: 'workspace_not_found' }));
+
+    const { loadDeskFiles } = await import('../../stores/desk-actions');
+    await loadDeskFiles('', null, 'mount_docs');
+
+    expect(useStore.getState().deskFiles).toBe(existingFiles);
+    expect(useStore.getState().deskTreeFilesByPath['']).toBe(existingFiles);
+  });
+
+  it('keeps cached tree children when a background tree refresh fails', async () => {
+    const existingChildren = [{ name: 'child.md', isDir: false }];
+    useStore.setState({
+      deskBasePath: 'studio:mount_docs',
+      deskWorkspaceMountId: 'mount_docs',
+      deskWorkspaceLabel: 'Docs',
+      deskTreeFilesByPath: { docs: existingChildren },
+    } as never);
+    mockHanaFetch.mockResolvedValueOnce(jsonResponse({ error: 'workspace_not_found' }));
+
+    const { loadDeskTreeFiles } = await import('../../stores/desk-actions');
+    await loadDeskTreeFiles('docs', { force: true });
+
+    expect(useStore.getState().deskTreeFilesByPath.docs).toBe(existingChildren);
+  });
+
   it('clears the stored native root when the workbench files response stops disclosing it', async () => {
     useStore.setState({
       deskBasePath: 'studio:mount_docs',
