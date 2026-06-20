@@ -40,12 +40,14 @@ const CHAPTER_RAIL_HEIGHT_RATIO = 0.5;
 
 function isEditable(previewItem: PreviewItem | null): boolean {
   if (!previewItem) return false;
+  if (previewItem.status === 'missing') return false;
   return EDITABLE_TYPES.has(previewItem.type)
     && (!!previewItem.filePath || isRemoteWorkbenchContentRef(previewItem.remoteContentRef));
 }
 
 function isMarkdownFile(previewItem: PreviewItem | null): boolean {
   return !!previewItem
+    && previewItem.status !== 'missing'
     && previewItem.type === 'markdown'
     && (!!previewItem.filePath || isRemoteWorkbenchContentRef(previewItem.remoteContentRef));
 }
@@ -431,7 +433,7 @@ export function PreviewPanel() {
             onNext={() => goFind(1)}
             onClose={() => setFindOpen(false)}
           />
-          {previewOpen && previewItem && (
+          {previewOpen && previewItem && previewItem.status !== 'missing' && (
             <FloatingActions
               content={previewItem.content}
               filePath={previewItem.filePath}

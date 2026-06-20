@@ -31,16 +31,6 @@ function isLatestRefresh(filePath: string, generation: number): boolean {
   return refreshGenerations.get(filePath) === generation;
 }
 
-function showMissingFileNotice(item: PreviewItem, filePath: string): void {
-  if (typeof window === 'undefined') return;
-  const fallback = `File is no longer available: ${item.title || filePath}`;
-  const translated = window.t?.('preview.fileMissing', { title: item.title || filePath });
-  const text = translated && translated !== 'preview.fileMissing' ? translated : fallback;
-  window.dispatchEvent(new CustomEvent('hana-inline-notice', {
-    detail: { text, type: 'error' },
-  }));
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
 }
@@ -91,7 +81,6 @@ export async function refreshPreviewItemsFromFile(filePath: string, options: Pre
     const read = await readFileForPreviewTypeWithRetry(filePath, item, generation, options);
     if (!isLatestRefresh(filePath, generation) || read === undefined) return;
     if (!read) {
-      showMissingFileNotice(item, filePath);
       upsertPreviewItem({
         ...item,
         status: 'missing',

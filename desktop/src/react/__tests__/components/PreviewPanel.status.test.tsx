@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -127,6 +127,29 @@ describe('PreviewPanel markdown editor status', () => {
     render(<PreviewPanel />);
 
     expect(screen.getByTestId('markdown-editor-status')).toHaveTextContent('选中 0 字 · 共 4 字');
+  });
+
+  it('renders a moved-or-deleted page for missing preview targets instead of the editor', () => {
+    useStore.setState({
+      previewItems: [{
+        id: 'missing-note',
+        type: 'markdown',
+        title: 'missing.md',
+        content: 'stale content',
+        filePath: '/tmp/missing.md',
+        status: 'missing',
+        missingAt: 1234,
+      }],
+      openTabs: ['missing-note'],
+      activeTabId: 'missing-note',
+      markdownPreviewIds: [],
+    } as Partial<StoreState>);
+
+    render(<PreviewPanel />);
+
+    expect(screen.getByText('原文稿已移动或者删除')).toBeInTheDocument();
+    expect(within(screen.getByTestId('preview-missing-target')).getByText('missing.md')).toBeInTheDocument();
+    expect(screen.queryByTestId('markdown-editor-status')).not.toBeInTheDocument();
   });
 
   it('refreshes an inactive open preview tab when its backing file changes', async () => {
