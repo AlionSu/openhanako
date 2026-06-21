@@ -90,6 +90,7 @@ describe('AssistantMessage completion actions', () => {
         showAvatar={false}
         sessionPath={sessionPath}
         isLatestAssistantMessage
+        showTurnCompletionTime
         retrySourceMessage={userMessage}
       />,
     );
@@ -121,7 +122,7 @@ describe('AssistantMessage completion actions', () => {
     expect(replayMock).toHaveBeenCalledWith(sessionPath, userMessage);
   });
 
-  it('keeps older assistant replies on the same inline footer without retry controls', () => {
+  it('does not render a footer unless the caller marks the assistant message as turn completion', () => {
     render(
       <AssistantMessage
         message={assistantMessage}
@@ -132,12 +133,8 @@ describe('AssistantMessage completion actions', () => {
       />,
     );
 
-    const footer = screen.getByTestId('assistant-completion-actions');
-    expect(within(footer).getByText('05:43')).toBeInTheDocument();
-    expect(within(footer).getByTitle('复制文本')).toBeInTheDocument();
-    expect(within(footer).getByTitle('截图')).toBeInTheDocument();
-    expect(within(footer).getByTitle('全选消息')).toBeInTheDocument();
-    expect(within(footer).getByTitle('选择消息')).toBeInTheDocument();
+    expect(screen.queryByText('05:43')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('assistant-completion-actions')).not.toBeInTheDocument();
     expect(screen.queryByTitle('重新生成')).not.toBeInTheDocument();
   });
 
@@ -162,7 +159,7 @@ describe('AssistantMessage completion actions', () => {
     expect(screen.getByTitle('选择消息')).toBeInTheDocument();
   });
 
-  it('hides retry while the assistant reply is still streaming but keeps the timestamp available', () => {
+  it('hides the assistant footer while the assistant reply is still streaming', () => {
     useStore.setState({ streamingSessions: [sessionPath] } as never);
 
     render(
@@ -171,16 +168,13 @@ describe('AssistantMessage completion actions', () => {
         showAvatar={false}
         sessionPath={sessionPath}
         isLatestAssistantMessage
+        showTurnCompletionTime
         retrySourceMessage={userMessage}
       />,
     );
 
-    expect(screen.getByText('05:43')).toBeInTheDocument();
-    expect(screen.getByTestId('assistant-completion-actions').className).not.toContain('messageFooterActionsTimePersistent');
+    expect(screen.queryByText('05:43')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('assistant-completion-actions')).not.toBeInTheDocument();
     expect(screen.queryByTitle('重新生成')).not.toBeInTheDocument();
-    expect(screen.getByTitle('复制文本')).toBeDisabled();
-    expect(screen.getByTitle('截图')).toBeDisabled();
-    expect(screen.getByTitle('全选消息')).toBeDisabled();
-    expect(screen.getByTitle('选择消息')).toBeDisabled();
   });
 });

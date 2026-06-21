@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatTranscript } from '../../components/chat/ChatTranscript';
 import { useStore } from '../../stores';
@@ -90,7 +90,7 @@ describe('ChatTranscript turn timestamps', () => {
     cleanup();
   });
 
-  it('shows each user and assistant message time in its own footer', () => {
+  it('shows assistant footer only on the final assistant message of each completed turn', () => {
     const items: ChatListItem[] = [
       user('u1', new Date(2026, 4, 7, 8, 0).getTime(), '第一轮'),
       assistant('a1-tool', new Date(2026, 4, 7, 8, 1).getTime(), [thinking('读文件')]),
@@ -108,11 +108,52 @@ describe('ChatTranscript turn timestamps', () => {
     );
 
     expect(screen.getByText('08:00')).toBeInTheDocument();
-    expect(screen.getByText('08:01')).toBeInTheDocument();
+    expect(screen.queryByText('08:01')).not.toBeInTheDocument();
     expect(screen.getByText('08:02')).toBeInTheDocument();
     expect(screen.getByText('09:00')).toBeInTheDocument();
-    expect(screen.getByText('09:01')).toBeInTheDocument();
+    expect(screen.queryByText('09:01')).not.toBeInTheDocument();
     expect(screen.getByText('09:02')).toBeInTheDocument();
+    expect(screen.getAllByTestId('assistant-completion-actions')).toHaveLength(2);
+  });
+
+  it('does not render the current assistant footer while the session is still streaming', () => {
+    useStore.setState({ streamingSessions: [sessionPath] } as never);
+
+    render(
+      <ChatTranscript
+        items={[
+          user('u1', new Date(2026, 4, 7, 8, 0).getTime(), '第一轮'),
+          assistant('a1-tool', new Date(2026, 4, 7, 8, 1).getTime(), [thinking('读文件')]),
+          assistant('a1-latest', new Date(2026, 4, 7, 8, 2).getTime(), [thinking('继续处理')]),
+        ]}
+        sessionPath={sessionPath}
+      />,
+    );
+
+    expect(screen.getByText('08:00')).toBeInTheDocument();
+    expect(screen.queryByText('08:01')).not.toBeInTheDocument();
+    expect(screen.queryByText('08:02')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('assistant-completion-actions')).not.toBeInTheDocument();
+  });
+
+  it('selects the whole assistant turn from the final assistant footer checkbox', () => {
+    const items: ChatListItem[] = [
+      user('u1', new Date(2026, 4, 7, 8, 0).getTime(), '第一轮'),
+      assistant('a1-tool', new Date(2026, 4, 7, 8, 1).getTime(), [thinking('读文件')]),
+      assistant('a1-final', new Date(2026, 4, 7, 8, 2).getTime(), [textBlock('第一轮完成')]),
+    ];
+
+    render(
+      <ChatTranscript
+        items={items}
+        sessionPath={sessionPath}
+      />,
+    );
+
+    const footer = screen.getByTestId('assistant-completion-actions');
+    fireEvent.click(within(footer).getByTitle('选择消息'));
+
+    expect(useStore.getState().selectedIdsBySession[sessionPath]).toEqual(['a1-tool', 'a1-final']);
   });
 
   it('renders interlude timeline items without an assistant message wrapper', () => {

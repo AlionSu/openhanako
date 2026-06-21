@@ -57,6 +57,7 @@ interface Props {
   readOnly?: boolean;
   isLatestAssistantMessage?: boolean;
   showTurnCompletionTime?: boolean;
+  assistantTurnSelectionIds?: readonly string[];
   retrySourceMessage?: ChatMessage | null;
   messageRef?: (element: HTMLDivElement | null) => void;
 }
@@ -72,6 +73,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   agentId,
   readOnly = false,
   isLatestAssistantMessage = false,
+  showTurnCompletionTime = false,
+  assistantTurnSelectionIds,
   retrySourceMessage = null,
   messageRef,
 }: Props) {
@@ -140,18 +143,19 @@ export const AssistantMessage = memo(function AssistantMessage({
     }
   }, [isStreaming, retrying, retrySourceMessage, sessionPath]);
 
-  const canShowRegenerateAction = !readOnly && isLatestAssistantMessage && !!retrySourceMessage && !isStreaming;
-  const shouldPersistCompletionTime = isLatestAssistantMessage && !isStreaming;
-  const timeText = formatMessageTime(message.timestamp);
+  const canShowRegenerateAction = !readOnly && showTurnCompletionTime && isLatestAssistantMessage && !!retrySourceMessage && !isStreaming;
+  const shouldPersistCompletionTime = showTurnCompletionTime && isLatestAssistantMessage && !isStreaming;
+  const timeText = showTurnCompletionTime && !isStreaming ? formatMessageTime(message.timestamp) : null;
   const standardMessageActions = useMessageFooterActions({
     messageId: message.id,
+    selectionIds: assistantTurnSelectionIds,
     sessionPath,
     onCopy: handleCopy,
     onScreenshot: () => { void handleScreenshot(); },
     copied,
     isStreaming,
   });
-  const messageActions = readOnly ? [] : standardMessageActions;
+  const messageActions = readOnly || !showTurnCompletionTime || isStreaming ? [] : standardMessageActions;
   const regenerateActions: MessageFooterAction[] = useMemo(() => [
     {
       id: 'regenerate',

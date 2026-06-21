@@ -9,6 +9,7 @@ import { MessageFooterActions, type MessageFooterAction } from './MessageFooterA
 
 interface Props {
   messageId: string;
+  selectionIds?: readonly string[];
   sessionPath: string;
   onCopy: () => void;
   onScreenshot: () => void;
@@ -19,6 +20,7 @@ interface Props {
 
 export function useMessageFooterActions({
   messageId,
+  selectionIds,
   sessionPath,
   onCopy,
   onScreenshot,
@@ -28,9 +30,13 @@ export function useMessageFooterActions({
   const { t } = useI18n();
   const selectedIds = useStore(s => selectSelectedIdsBySession(s, sessionPath));
   const sessionItems = useStore(s => sessionScopedValue(s, s.chatSessions, sessionPath)?.items);
-  const isSelected = selectedIds.includes(messageId);
-  const toggle = useStore(s => s.toggleMessageSelection);
   const setSelection = useStore(s => s.setMessageSelection);
+  const targetSelectionIds = useMemo(() => {
+    const ids = selectionIds && selectionIds.length > 0 ? selectionIds : [messageId];
+    return Array.from(new Set(ids.filter(Boolean)));
+  }, [messageId, selectionIds]);
+  const targetSelectionIdSet = useMemo(() => new Set(targetSelectionIds), [targetSelectionIds]);
+  const isSelected = targetSelectionIds.length > 0 && targetSelectionIds.every(id => selectedIds.includes(id));
   const selectableIds = useMemo(() => (
     (sessionItems || [])
       .filter(item => item.type === 'message')
@@ -40,8 +46,12 @@ export function useMessageFooterActions({
 
   const handleToggle = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    toggle(sessionPath, messageId);
-  }, [toggle, sessionPath, messageId]);
+    if (isSelected) {
+      setSelection(sessionPath, selectedIds.filter(id => !targetSelectionIdSet.has(id)));
+      return;
+    }
+    setSelection(sessionPath, [...selectedIds, ...targetSelectionIds]);
+  }, [isSelected, selectedIds, sessionPath, setSelection, targetSelectionIdSet, targetSelectionIds]);
 
   const handleSelectAll = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
