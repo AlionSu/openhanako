@@ -78,6 +78,36 @@ describe("MountProvider", () => {
     expect(read.content.toString("utf-8")).toBe("hello");
   });
 
+  it("resolves local_fs watch targets and maps native child paths back to mount resources", () => {
+    const { mountRoot, provider } = setup();
+    const target = provider.watchTarget({ kind: "mount", mountId: "mount_local", path: "docs" });
+    const expectedRoot = path.join(fs.realpathSync(mountRoot), "docs");
+    const changedPath = path.join(expectedRoot, "notes", "a.md");
+
+    expect(target).toMatchObject({
+      filePath: expectedRoot,
+      resourceKey: "mount:mount_local:docs",
+      resource: {
+        kind: "mount",
+        mountId: "mount_local",
+        path: "docs",
+        provider: "mount",
+        filePath: expectedRoot,
+      },
+    });
+
+    expect(target.toResource(changedPath)).toMatchObject({
+      resourceKey: "mount:mount_local:docs/notes/a.md",
+      resource: {
+        kind: "mount",
+        mountId: "mount_local",
+        path: "docs/notes/a.md",
+        provider: "mount",
+        filePath: changedPath,
+      },
+    });
+  });
+
   it("rejects path escapes and unsupported remote mounts explicitly", async () => {
     const { provider } = setup();
 

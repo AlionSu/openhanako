@@ -83,4 +83,82 @@ describe("ResourceWatchRegistry", () => {
     expect(close).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("uses provider watch targets and emits canonical provider resources", async () => {
+    vi.useFakeTimers();
+    const mountRoot = path.join("/mnt", "docs");
+    const changedPath = path.join(mountRoot, "notes", "a.md");
+    const close = vi.fn();
+    const emitEvent = vi.fn();
+    let onChange: ((changedPath?: string | null) => void) | null = null;
+
+    const registry = new ResourceWatchRegistry({
+      emitEvent,
+      debounceMs: 5,
+      resolveWatchTarget: vi.fn((resource) => ({
+        ref: resource,
+        filePath: mountRoot,
+        resourceKey: "mount:mount_local:",
+        resource: {
+          kind: "mount",
+          mountId: "mount_local",
+          path: "",
+          provider: "mount",
+          filePath: mountRoot,
+        },
+        toResource: (eventPath) => ({
+          resourceKey: "mount:mount_local:notes/a.md",
+          resource: {
+            kind: "mount",
+            mountId: "mount_local",
+            path: "notes/a.md",
+            provider: "mount",
+            filePath: eventPath,
+          },
+        }),
+      })),
+      watchPath: vi.fn((_targetPath, handler) => {
+        onChange = handler;
+        return { close };
+      }),
+      statPath: vi.fn(() => ({
+        exists: true,
+        isDirectory: false,
+        mtimeMs: 456,
+        size: 11,
+      })),
+    });
+
+    const subscription = registry.subscribe({
+      purpose: "workspace-tree",
+      resources: [{ kind: "mount", mountId: "mount_local", path: "" }],
+    });
+
+    expect(subscription.resourceKeys).toEqual(["mount:mount_local:"]);
+    expect(registry.diagnostics().watches[0]).toMatchObject({
+      resourceKey: "mount:mount_local:",
+      filePath: mountRoot,
+    });
+
+    onChange?.(changedPath);
+    await vi.runAllTimersAsync();
+
+    expect(emitEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: "resource.changed",
+      source: "provider_watch",
+      resourceKey: "mount:mount_local:notes/a.md",
+      resource: expect.objectContaining({
+        kind: "mount",
+        mountId: "mount_local",
+        path: "notes/a.md",
+        provider: "mount",
+        filePath: changedPath,
+      }),
+      version: { mtimeMs: 456, size: 11 },
+    }), null);
+
+    registry.unsubscribe(subscription.subscriptionId);
+    expect(close).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });

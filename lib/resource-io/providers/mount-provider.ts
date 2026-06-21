@@ -100,6 +100,34 @@ export class MountProvider {
     return this.mapResult(ref, await resolved.provider.materialize({ kind: "local-file", path: resolved.path }));
   }
 
+  watchTarget(ref: ResourceRef) {
+    if (ref.kind !== "mount") {
+      throw new ResourceIOError(`mount provider cannot resolve ${ref.kind}`, {
+        code: "invalid_resource_ref",
+        status: 400,
+      });
+    }
+    const resolved = this.resolveLocalMount(ref, "read");
+    if (!resolved.mount.capabilities?.includes("watch")) throw capabilityDenied("watch", "mount");
+    const normalizedRef = { kind: "mount" as const, mountId: ref.mountId, path: resolved.mountPath };
+    return {
+      ref: normalizedRef,
+      filePath: resolved.path,
+      resourceKey: resourceKeyForRef(normalizedRef),
+      resource: mountResourceForPath(ref.mountId, resolved.mountPath, resolved.path),
+      toResource: (changedPath: string) => {
+        const eventPath = path.isAbsolute(changedPath) ? path.normalize(changedPath) : path.join(resolved.path, changedPath);
+        const mountPath = mountPathForNativePath(resolved.mountPath, resolved.path, eventPath);
+        const eventRef = { kind: "mount" as const, mountId: ref.mountId, path: mountPath };
+        return {
+          resourceKey: resourceKeyForRef(eventRef),
+          resource: mountResourceForPath(ref.mountId, mountPath, eventPath),
+          filePath: eventPath,
+        };
+      },
+    };
+  }
+
   async copy(from: ResourceRef, to: ResourceRef): Promise<ResourceMutationResult> {
     const source = this.resolveLocalMount(from, "read");
     const target = this.resolveLocalMount(to, "write");
@@ -201,6 +229,29 @@ export class MountProvider {
       } satisfies ResourceDescriptor,
     };
   }
+}
+
+function mountResourceForPath(mountId: string, mountPath: string, filePath: string): ResourceDescriptor {
+  return {
+    kind: "mount",
+    mountId,
+    path: mountPath,
+    provider: "mount",
+    filePath,
+  };
+}
+
+function mountPathForNativePath(rootMountPath: string, rootNativePath: string, changedPath: string): string {
+  const relative = path.relative(rootNativePath, changedPath);
+  if (!relative) return rootMountPath;
+  if (relative.startsWith("..") || path.isAbsolute(relative)) return rootMountPath;
+  return joinMountPath(rootMountPath, relative.split(path.sep).join("/"));
+}
+
+function joinMountPath(rootMountPath: string, relativeSlashPath: string): string {
+  const root = rootMountPath.replace(/^\/+|\/+$/g, "");
+  const relative = relativeSlashPath.replace(/^\/+|\/+$/g, "");
+  return [root, relative].filter(Boolean).join("/");
 }
 
 function normalizeMountPath(value: string): string {

@@ -16,6 +16,13 @@ import type {
 
 type Provider = {
   capabilities?: (ref: ResourceRef) => Record<string, boolean | undefined>;
+  watchTarget?: (ref: ResourceRef) => {
+    ref?: ResourceRef;
+    filePath: string;
+    resourceKey: string;
+    resource: any;
+    toResource?: (changedPath: string) => { resourceKey: string; resource: any; filePath?: string };
+  };
   stat?: (ref: ResourceRef) => Promise<ResourceStat>;
   read?: (ref: ResourceRef) => Promise<ResourceReadResult>;
   write?: (ref: ResourceRef, content: string | Buffer) => Promise<ResourceMutationResult>;
@@ -110,6 +117,16 @@ export class ResourceIO {
   async materialize(input: unknown): Promise<MaterializeResult> {
     const ref = normalizeResourceRef(input);
     return this.callProvider<MaterializeResult>(ref, "materialize", ref);
+  }
+
+  resolveWatchTarget(input: unknown) {
+    const ref = normalizeResourceRef(input);
+    const provider = this.providerFor(ref);
+    const capabilities = provider.capabilities?.(ref) || {};
+    if (capabilities.watch === false || typeof provider.watchTarget !== "function") {
+      throw capabilityDenied("watch", providerIdForRef(ref));
+    }
+    return provider.watchTarget(ref);
   }
 
   async copy(from: unknown, to: unknown, options: MutationOptions = {}): Promise<ResourceMutationResult> {

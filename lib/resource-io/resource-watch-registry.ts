@@ -7,6 +7,17 @@ import type { ResourceRef } from "./types.ts";
 
 type WatchHandle = { close: () => void };
 type WatchPath = (targetPath: string, handler: (changedPath?: string | null) => void) => WatchHandle;
+type WatchResourceSnapshot = {
+  resourceKey: string;
+  resource: any;
+  filePath?: string;
+};
+type WatchTarget = WatchResourceSnapshot & {
+  ref?: ResourceRef;
+  filePath: string;
+  toResource?: (changedPath: string) => WatchResourceSnapshot;
+};
+type ResolveWatchTarget = (resource: unknown) => WatchTarget;
 type StatPath = (targetPath: string) => {
   exists: boolean;
   isDirectory: boolean;
@@ -17,6 +28,7 @@ type StatPath = (targetPath: string) => {
 type Options = {
   emitEvent: (event: object, sessionPath?: string | null) => void;
   debounceMs?: number;
+  resolveWatchTarget?: ResolveWatchTarget;
   watchPath?: WatchPath;
   statPath?: StatPath;
 };
@@ -25,6 +37,8 @@ type Entry = {
   ref: ResourceRef;
   filePath: string;
   resourceKey: string;
+  resource: any;
+  toResource?: (changedPath: string) => WatchResourceSnapshot;
   refCount: number;
   handle: WatchHandle;
   timer: ReturnType<typeof setTimeout> | null;
@@ -43,6 +57,7 @@ export class ResourceWatchRegistry {
   declare entries: Map<string, Entry>;
   declare subscriptions: Map<string, Subscription>;
   declare debounceMs: number;
+  declare resolveWatchTarget: ResolveWatchTarget;
   declare watchPath: WatchPath;
   declare statPath: StatPath;
   declare eventBus: ResourceEventBus;
@@ -50,12 +65,14 @@ export class ResourceWatchRegistry {
   constructor({
     emitEvent,
     debounceMs = 80,
+    resolveWatchTarget = defaultResolveWatchTarget,
     watchPath = defaultWatchPath,
     statPath = defaultStatPath,
   }: Options) {
     this.entries = new Map();
     this.subscriptions = new Map();
     this.debounceMs = debounceMs;
+    this.resolveWatchTarget = resolveWatchTarget;
     this.watchPath = watchPath;
     this.statPath = statPath;
     this.eventBus = new ResourceEventBus({ emit: emitEvent });
@@ -113,7 +130,7 @@ export class ResourceWatchRegistry {
   }
 
   retain(input: unknown): () => void {
-    const { ref, filePath, resourceKey } = this.normalizeWatchResource(input);
+    const { ref, filePath, resourceKey, resource, toResource } = this.normalizeWatchResource(input);
     const existing = this.entries.get(resourceKey);
     if (existing) {
       existing.refCount += 1;
@@ -121,9 +138,11 @@ export class ResourceWatchRegistry {
     }
 
     const entry: Entry = {
-      ref: { kind: "local-file", path: filePath },
+      ref,
       filePath,
       resourceKey,
+      resource,
+      toResource,
       refCount: 1,
       handle: this.watchPath(filePath, (changedPath) => this.schedule(entry, changedPath)),
       timer: null,
@@ -134,16 +153,17 @@ export class ResourceWatchRegistry {
   }
 
   normalizeWatchResource(input: unknown) {
-    const ref = normalizeResourceRef(input);
-    if (ref.kind !== "local-file") {
-      throw new Error(`ResourceWatchRegistry only supports local-file watches for now: ${ref.kind}`);
+    const target = this.resolveWatchTarget(input);
+    if (!target?.filePath || !target?.resourceKey || !target?.resource) {
+      throw new Error("ResourceWatchRegistry resolver returned an invalid watch target");
     }
-    const filePath = path.isAbsolute(ref.path) ? path.normalize(ref.path) : path.resolve(ref.path);
-    const normalizedRef = { kind: "local-file" as const, path: filePath };
+    const filePath = path.isAbsolute(target.filePath) ? path.normalize(target.filePath) : path.resolve(target.filePath);
     return {
-      ref: normalizedRef,
+      ref: (target.ref || normalizeResourceRef(input)) as ResourceRef,
       filePath,
-      resourceKey: resourceKeyForRef(normalizedRef),
+      resourceKey: target.resourceKey,
+      resource: target.resource,
+      toResource: target.toResource,
     };
   }
 
@@ -171,16 +191,11 @@ export class ResourceWatchRegistry {
 
   emitSnapshot(entry: Entry): void {
     if (!this.entries.has(entry.resourceKey)) return;
-    const eventPath = entry.pendingPath || entry.filePath;
+    const eventPath = normalizeChangedPath(entry.filePath, entry.pendingPath);
     entry.pendingPath = null;
     const stat = this.statPath(eventPath);
-    const resourceKey = resourceKeyForRef({ kind: "local-file", path: eventPath });
-    const resource = {
-      kind: "local-file" as const,
-      provider: "local_fs",
-      path: eventPath,
-      filePath: eventPath,
-    };
+    const snapshot = entry.toResource?.(eventPath) || localWatchSnapshot(eventPath);
+    const { resourceKey, resource } = snapshot;
     if (!stat.exists) {
       this.eventBus.deleted({
         resourceKey,
@@ -202,6 +217,39 @@ export class ResourceWatchRegistry {
       sessionPath: null,
     });
   }
+}
+
+function defaultResolveWatchTarget(input: unknown): WatchTarget {
+  const ref = normalizeResourceRef(input);
+  if (ref.kind !== "local-file") {
+    throw new Error(`ResourceWatchRegistry cannot resolve provider watch target for ${ref.kind}`);
+  }
+  const filePath = path.isAbsolute(ref.path) ? path.normalize(ref.path) : path.resolve(ref.path);
+  const snapshot = localWatchSnapshot(filePath);
+  return {
+    ref: { kind: "local-file", path: filePath },
+    filePath,
+    ...snapshot,
+    toResource: localWatchSnapshot,
+  };
+}
+
+function normalizeChangedPath(rootPath: string, changedPath?: string | null): string {
+  if (!changedPath) return rootPath;
+  return path.isAbsolute(changedPath) ? path.normalize(changedPath) : path.join(rootPath, changedPath);
+}
+
+function localWatchSnapshot(filePath: string): WatchResourceSnapshot {
+  return {
+    resourceKey: resourceKeyForRef({ kind: "local-file", path: filePath }),
+    resource: {
+      kind: "local-file" as const,
+      provider: "local_fs",
+      path: filePath,
+      filePath,
+    },
+    filePath,
+  };
 }
 
 function defaultWatchPath(targetPath: string, handler: (changedPath?: string | null) => void): WatchHandle {

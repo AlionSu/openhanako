@@ -1000,10 +1000,6 @@
         "title": "Proactive subagent delegation",
         "description": "When enabled, the agent proactively delegates broad exploration and research tasks to subagents, conserving the main chat's context attention. May yield better results for complex tasks."
       },
-      "resourceIoTools": {
-        "title": "ResourceIO file tools",
-        "description": "When enabled, read, write, edit, grep, find, and ls in new sessions route through ResourceIO. File edits emit server-side refresh events. Bash stays on the current path for now."
-      },
       "subagentTitle": "Subagent",
       "subagentSectionDescription": "Control how the agent decides when to delegate work to subagents."
     },

@@ -1000,10 +1000,6 @@
         "title": "更积极地调用 subagent",
         "description": "节省主聊天的上下文注意力资源，可能有更好的工作结果。开启后，agent 会主动把范围较广的探索和调研任务委派给 subagent。"
       },
-      "resourceIoTools": {
-        "title": "ResourceIO 文件工具",
-        "description": "打开后，新会话里的 read、write、edit、grep、find、ls 会走 ResourceIO 路线，文件修改会由服务端统一发出刷新事件。Bash 暂时保持原链路。"
-      },
       "subagentTitle": "Subagent",
       "subagentSectionDescription": "控制 agent 何时将工作委派给 subagent。"
     },

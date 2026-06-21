@@ -153,6 +153,25 @@ export class LocalFsProvider {
     };
   }
 
+  watchTarget(ref: ResourceRef | unknown) {
+    const filePath = this.resolvePath(ref);
+    this.assertAllowed(filePath, "read");
+    return {
+      ref: { kind: "local-file" as const, path: filePath },
+      filePath,
+      resourceKey: localResourceKey(filePath),
+      resource: this.resourceForPath(filePath),
+      toResource: (changedPath: string) => {
+        const eventPath = path.isAbsolute(changedPath) ? path.normalize(changedPath) : path.join(filePath, changedPath);
+        return {
+          resourceKey: localResourceKey(eventPath),
+          resource: this.resourceForPath(eventPath),
+          filePath: eventPath,
+        };
+      },
+    };
+  }
+
   async list(ref: ResourceRef | unknown): Promise<ResourceListResult> {
     const dirPath = this.resolvePath(ref);
     this.assertAllowed(dirPath, "read");

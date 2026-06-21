@@ -284,6 +284,7 @@ export class HanaEngine {
     });
     this._resourceWatchRegistry = new ResourceWatchRegistry({
       emitEvent: (event, sessionPath) => this._emitEvent(event, sessionPath),
+      resolveWatchTarget: (resource) => this.getResourceIO().resolveWatchTarget(resource),
     });
     this._sessionManifestStoreRecovery = null;
     this._sessionManifestStore = this._openSessionManifestStore();
