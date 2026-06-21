@@ -5,6 +5,7 @@ const previewRefreshMocks = vi.hoisted(() => ({
   catchUpOptions: { retryMissing: true },
   refreshPreviewDocumentTarget: vi.fn(async () => undefined),
   refreshOpenPreviewDocuments: vi.fn(async () => undefined),
+  refreshOpenPreviewDocumentsForResourceChange: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../hooks/use-stream-buffer', () => ({
@@ -41,6 +42,7 @@ vi.mock('../../utils/preview-document-refresh', () => ({
   PREVIEW_DOCUMENT_CATCH_UP_REFRESH_OPTIONS: previewRefreshMocks.catchUpOptions,
   refreshPreviewDocumentTarget: previewRefreshMocks.refreshPreviewDocumentTarget,
   refreshOpenPreviewDocuments: previewRefreshMocks.refreshOpenPreviewDocuments,
+  refreshOpenPreviewDocumentsForResourceChange: previewRefreshMocks.refreshOpenPreviewDocumentsForResourceChange,
 }));
 
 vi.mock('../../services/stream-resume', () => ({
@@ -67,6 +69,7 @@ afterEach(() => {
   resetSessionRefreshSchedulerForTest();
   previewRefreshMocks.refreshPreviewDocumentTarget.mockClear();
   previewRefreshMocks.refreshOpenPreviewDocuments.mockClear();
+  previewRefreshMocks.refreshOpenPreviewDocumentsForResourceChange.mockClear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -911,6 +914,21 @@ describe('ws-message-handler app events', () => {
     });
 
     expect(handleAppEvent).toHaveBeenCalledWith('models-changed', { reason: 'provider' }, { source: 'server' });
+  });
+
+  it('resource.changed 消息会刷新匹配的打开预览文档', () => {
+    const msg = {
+      type: 'resource.changed',
+      filePath: '/workspace/notes/a.md',
+      resource: { kind: 'local-file', provider: 'local_fs', path: '/workspace/notes/a.md' },
+    };
+
+    handleServerMessage(msg);
+
+    expect(previewRefreshMocks.refreshOpenPreviewDocumentsForResourceChange).toHaveBeenCalledWith(
+      msg,
+      previewRefreshMocks.changeOptions,
+    );
   });
 });
 

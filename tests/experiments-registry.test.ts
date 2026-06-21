@@ -9,6 +9,7 @@ import {
   DEEPSEEK_ROLEPLAY_REASONING_PATCH_EXPERIMENT_ID,
   getExperimentDefinitions,
   getResolvedExperimentValue,
+  RESOURCE_IO_TOOLS_EXPERIMENT_ID,
   setExperimentValue,
 } from "../lib/experiments/registry.ts";
 
@@ -76,6 +77,22 @@ describe("experiment registry", () => {
     });
   });
 
+  it("defines ResourceIO tools as a boolean toggle defaulting to off", () => {
+    const defs = getExperimentDefinitions();
+    const entry = defs.find((def) => def.id === RESOURCE_IO_TOOLS_EXPERIMENT_ID);
+
+    expect(entry).toMatchObject({
+      id: RESOURCE_IO_TOOLS_EXPERIMENT_ID,
+      owner: "session",
+      scope: "global",
+      defaultValue: false,
+      valueSchema: {
+        type: "boolean",
+        presentation: { type: "toggle" },
+      },
+    });
+  });
+
   it("rejects unknown experiment ids without writing preferences", () => {
     const { prefs } = makePrefs();
 
@@ -106,6 +123,11 @@ describe("experiment registry", () => {
     expect(prefs.getPreferences().experiments[DEEPSEEK_ROLEPLAY_REASONING_PATCH_EXPERIMENT_ID]).toBe(true);
     expect(setExperimentValue(prefs, DEEPSEEK_ROLEPLAY_REASONING_PATCH_EXPERIMENT_ID, false)).toBe(false);
     expect(getResolvedExperimentValue(prefs, DEEPSEEK_ROLEPLAY_REASONING_PATCH_EXPERIMENT_ID)).toBe(false);
+
+    expect(getResolvedExperimentValue(prefs, RESOURCE_IO_TOOLS_EXPERIMENT_ID)).toBe(false);
+    expect(setExperimentValue(prefs, RESOURCE_IO_TOOLS_EXPERIMENT_ID, true)).toBe(true);
+    expect(getResolvedExperimentValue(prefs, RESOURCE_IO_TOOLS_EXPERIMENT_ID)).toBe(true);
+    expect(prefs.getPreferences().experiments[RESOURCE_IO_TOOLS_EXPERIMENT_ID]).toBe(true);
   });
 
   it("rejects invalid enum values", () => {

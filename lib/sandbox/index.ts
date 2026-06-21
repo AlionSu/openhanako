@@ -31,6 +31,7 @@ import {
 } from "../pi-sdk/index.ts";
 import { normalizeWin32ShellPath } from "./win32-path.ts";
 import { serializeSessionFile } from "../session-files/session-file-response.ts";
+import { wrapResourceIoFileTools } from "../resource-io/agent-tools.ts";
 
 /**
  * 为一个 session 创建沙盒包装后的工具集
@@ -57,6 +58,8 @@ import { serializeSessionFile } from "../session-files/session-file-response.ts"
  * @param {(entry: object) => void} [opts.recordFileOperation]  记录 write/edit 触达的 session file
  * @param {() => object|null} [opts.getVisionBridge]  辅助视觉桥
  * @param {() => boolean} [opts.isVisionAuxiliaryEnabled]  辅助视觉开关
+ * @param {boolean} [opts.useResourceIoTools]  用 ResourceIO 包装同名文件工具
+ * @param {(event: object, sessionPath?: string|null) => void} [opts.emitEvent]  ResourceIO 事件出口
  * @param {object|null} [opts.legacyCleanupQueue] Windows 旧 ACL 清理队列
  * @returns {{ tools: object[], customTools: object[] }}
  */
@@ -76,6 +79,8 @@ export function createSandboxedTools(cwd, customTools, {
   recordFileOperation,
   getVisionBridge,
   isVisionAuxiliaryEnabled,
+  useResourceIoTools = false,
+  emitEvent,
   legacyCleanupQueue = null,
 }) {
   // 始终按 standard 模式构建策略和 PathGuard，wrappers 在运行时动态 bypass
@@ -149,6 +154,14 @@ export function createSandboxedTools(cwd, customTools, {
     getVisionBridge,
     isVisionAuxiliaryEnabled,
   }), { getSessionPath, resolveSessionFile });
+  const maybeWrapResourceIoFileTools = (tools) => useResourceIoTools
+    ? wrapResourceIoFileTools(tools, {
+        cwd,
+        getSessionPath,
+        resolveSessionFile,
+        emitEvent,
+      })
+    : tools;
 
   // ── Windows: PathGuard 包装 + restricted-token exec，关闭沙盒时走 direct fallback ──
   if (platform === "win32-restricted-token") {
@@ -166,7 +179,7 @@ export function createSandboxedTools(cwd, customTools, {
       },
     });
     return {
-      tools: [
+      tools: maybeWrapResourceIoFileTools([
         wrapPathTool(readTool, guard, "read", cwd, wrapOpts),
         wrapPathTool(writeTool, guard, "write", cwd, wrapOpts),
         wrapPathTool(editTool, guard, "write", cwd, wrapOpts),
@@ -174,7 +187,7 @@ export function createSandboxedTools(cwd, customTools, {
         wrapPathTool(createGrepTool(cwd, undefined), guard, "read", cwd, wrapOpts),
         wrapPathTool(createFindTool(cwd, undefined), guard, "read", cwd, wrapOpts),
         wrapPathTool(createLsTool(cwd), guard, "read", cwd, wrapOpts),
-      ],
+      ]),
       customTools,
     };
   }
@@ -202,7 +215,7 @@ export function createSandboxedTools(cwd, customTools, {
   }
 
   return {
-    tools: [
+    tools: maybeWrapResourceIoFileTools([
       wrapPathTool(readTool, guard, "read", cwd, wrapOpts),
       wrapPathTool(writeTool, guard, "write", cwd, wrapOpts),
       wrapPathTool(editTool, guard, "write", cwd, wrapOpts),
@@ -210,7 +223,7 @@ export function createSandboxedTools(cwd, customTools, {
       wrapPathTool(createGrepTool(cwd, undefined), guard, "read", cwd, wrapOpts),
       wrapPathTool(createFindTool(cwd, undefined), guard, "read", cwd, wrapOpts),
       wrapPathTool(createLsTool(cwd), guard, "read", cwd, wrapOpts),
-    ],
+    ]),
     customTools,
   };
 }

@@ -106,6 +106,10 @@ import { AgentManager } from "./agent-manager.ts";
 import { sanitizeMessagesForModel, stripHistoricalInlineMediaForReplay } from "./message-sanitizer.ts";
 import { normalizeProviderContextMessages, normalizeProviderPayload } from "./provider-compat.ts";
 import { VisionBridge } from "./vision-bridge.ts";
+import {
+  getResolvedExperimentValue,
+  RESOURCE_IO_TOOLS_EXPERIMENT_ID,
+} from "../lib/experiments/registry.ts";
 import { SessionCoordinator } from "./session-coordinator.ts";
 import { SessionManifestResolver } from "./session-manifest/resolver.ts";
 import { SessionManifestStore } from "./session-manifest/store.ts";
@@ -2180,6 +2184,7 @@ export class HanaEngine {
       });
     };
 
+    const useResourceIoTools = getResolvedExperimentValue(this._prefs, RESOURCE_IO_TOOLS_EXPERIMENT_ID) === true;
     let result = createSandboxedTools(cwd, allTools, {
       agentDir: effectiveAgentDir,
       workspace: effectiveWorkspace,
@@ -2202,6 +2207,8 @@ export class HanaEngine {
       recordFileOperation: (entry) => this.recordSessionFileOperation(entry),
       getVisionBridge: () => this.getVisionBridge(),
       isVisionAuxiliaryEnabled: () => this.isVisionAuxiliaryEnabled(),
+      useResourceIoTools,
+      emitEvent: (event, sessionPath) => this._emitEvent(event, sessionPath),
       legacyCleanupQueue: this._win32LegacySandboxCleanupQueue,
     } as any);
 

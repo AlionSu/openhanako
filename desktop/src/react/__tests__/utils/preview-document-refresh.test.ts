@@ -260,4 +260,33 @@ describe('preview document refresh', () => {
       PREVIEW_DOCUMENT_CHANGE_REFRESH_OPTIONS,
     );
   });
+
+  it('refreshes matching open documents from a ResourceIO local change event', async () => {
+    useStore.setState({
+      previewItems: [
+        localItem('open-local', '/workspace/notes/local.md'),
+        localItem('closed-local', '/workspace/notes/closed.md'),
+      ],
+      openTabs: ['open-local'],
+    } as Partial<StoreState>);
+    const {
+      PREVIEW_DOCUMENT_CHANGE_REFRESH_OPTIONS,
+      refreshOpenPreviewDocumentsForResourceChange,
+    } = await import('../../utils/preview-document-refresh');
+
+    await refreshOpenPreviewDocumentsForResourceChange({
+      type: 'resource.changed',
+      resource: {
+        kind: 'local-file',
+        provider: 'local_fs',
+        path: '/workspace/notes/local.md',
+      },
+    } as any);
+
+    expect(mocks.refreshPreviewItemsFromFile).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshPreviewItemsFromFile).toHaveBeenCalledWith(
+      '/workspace/notes/local.md',
+      PREVIEW_DOCUMENT_CHANGE_REFRESH_OPTIONS,
+    );
+  });
 });

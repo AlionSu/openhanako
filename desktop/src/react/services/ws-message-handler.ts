@@ -28,6 +28,7 @@ import {
   PREVIEW_DOCUMENT_CATCH_UP_REFRESH_OPTIONS,
   PREVIEW_DOCUMENT_CHANGE_REFRESH_OPTIONS,
   refreshOpenPreviewDocuments,
+  refreshOpenPreviewDocumentsForResourceChange,
   refreshPreviewDocumentTarget,
 } from '../utils/preview-document-refresh';
 import {
@@ -479,6 +480,13 @@ export function handleServerMessage(msg: any): void {
 
   // 非聊天渲染事件走传统 switch
   switch (msg.type) {
+    case 'resource.changed': {
+      void refreshOpenPreviewDocumentsForResourceChange(
+        msg,
+        PREVIEW_DOCUMENT_CHANGE_REFRESH_OPTIONS,
+      );
+      break;
+    }
     case 'session_branch_reset': {
       const sp = msg.sessionPath;
       const targetId = msg.clientMessageId || msg.messageId;
