@@ -847,9 +847,12 @@ export class PluginManager {
               || null;
             const sessionCtx = normalizeToolSessionRef(runtimeCtx, fallbackSessionPath);
             const helperCtx = withInvocationSessionHelpers(ctx, sessionCtx);
+            const invocationResources = typeof ctx.__createInvocationResources === "function"
+              ? ctx.__createInvocationResources({ ...runtimeCtx, ...sessionCtx })
+              : ctx.resources;
             const mergedCtx = hasExplicitCtx
-              ? { ...ctx, ...runtimeCtx, ...sessionCtx, ...helperCtx, resources: ctx.resources }
-              : { ...ctx, ...sessionCtx, ...helperCtx, resources: ctx.resources };
+              ? { ...ctx, ...runtimeCtx, ...sessionCtx, ...helperCtx, resources: invocationResources }
+              : { ...ctx, ...sessionCtx, ...helperCtx, resources: invocationResources };
             const raw = await origExecute(params, mergedCtx);
             return normalizePluginToolResult(raw, ctx.pluginId);
           },

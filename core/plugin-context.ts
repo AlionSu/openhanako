@@ -22,21 +22,7 @@ type PluginResourceWatchResult = {
  */
 export function createPluginContext({ pluginId, pluginKey, source, pluginDir, dataDir, bus, accessLevel, permissions, capabilities, sensitiveCapabilities, network = null, fetchImpl = undefined, registerSessionFile: registerSessionFileImpl, emitResourceChanged, resourceIO = null, resourceWatch = null, configSchema, logSink, runtimeContext }) {
   const config = createPluginConfigStore({ dataDir, schema: configSchema });
-  const runtimeScope = runtimeContext ? {
-    serverId: runtimeContext.serverId,
-    serverNodeId: runtimeContext.serverNodeId ?? runtimeContext.serverId,
-    userId: runtimeContext.userId,
-    studioId: runtimeContext.studioId,
-    connectionKind: runtimeContext.connectionKind,
-    credentialKind: runtimeContext.credentialKind,
-    platformAccountId: runtimeContext.platformAccountId ?? null,
-    officialServiceKind: runtimeContext.officialServiceKind ?? null,
-    executionBoundary: clonePlain(runtimeContext.executionBoundary),
-    sessionId: textOrNull(runtimeContext.sessionId),
-    sessionPath: textOrNull(runtimeContext.sessionPath),
-    requestId: textOrNull(runtimeContext.requestId),
-    sessionRef: normalizeSessionRef(runtimeContext.sessionRef, runtimeContext),
-  } : {};
+  const runtimeScope: any = runtimeContext ? normalizeRuntimeScope(runtimeContext) : {};
 
   const resolvedAccess = accessLevel || "restricted";
   const grantedPermissions = normalizePermissions(permissions);
@@ -49,14 +35,15 @@ export function createPluginContext({ pluginId, pluginKey, source, pluginDir, da
     sensitiveCapabilities: declaredSensitiveCapabilities,
     fetchImpl,
   });
-  const pluginResources = createPluginResources({
+  const createScopedPluginResources = (scope: any = {}) => createPluginResources({
     pluginId,
     resourceIO,
     resourceWatch,
     capabilities: declaredCapabilities,
     sensitiveCapabilities: declaredSensitiveCapabilities,
-    runtimeScope,
+    runtimeScope: normalizeRuntimeScope(scope, runtimeScope),
   });
+  const pluginResources = createScopedPluginResources();
   const prefix = `[plugin:${pluginId}]`;
   const recordLog = (level, args) => {
     if (typeof logSink !== "function") return;
@@ -162,7 +149,7 @@ export function createPluginContext({ pluginId, pluginKey, source, pluginDir, da
     },
   });
 
-  return {
+  const context = {
     ...runtimeScope,
     pluginId,
     pluginKey: pluginKey || pluginId,
@@ -181,6 +168,11 @@ export function createPluginContext({ pluginId, pluginKey, source, pluginDir, da
     registerSessionFile,
     stageFile,
   };
+  Object.defineProperty(context, "__createInvocationResources", {
+    value: createScopedPluginResources,
+    enumerable: false,
+  });
+  return context;
 }
 
 function createPluginBusProxy(bus, { ownerContext, grantedPermissions, allowHandle }) {
@@ -294,6 +286,37 @@ function normalizeSessionRef(value, fallback: any = {}) {
     sessionId,
     ...(sessionPath ? { sessionPath } : {}),
     ...(legacySessionPath ? { legacySessionPath } : {}),
+  };
+}
+
+function normalizeRuntimeScope(value: any = {}, fallback: any = {}) {
+  const sessionId = textOrNull(value?.sessionId)
+    || textOrNull(value?.sessionRef?.sessionId)
+    || textOrNull(fallback.sessionId);
+  const sessionPath = textOrNull(value?.sessionPath)
+    || textOrNull(value?.sessionRef?.sessionPath)
+    || textOrNull(value?.sessionRef?.path)
+    || textOrNull(fallback.sessionPath);
+  const requestId = textOrNull(value?.requestId) || textOrNull(fallback.requestId);
+  const sessionRef = normalizeSessionRef(value?.sessionRef, {
+    ...(fallback.sessionRef || {}),
+    sessionId,
+    sessionPath,
+  }) || fallback.sessionRef || null;
+  return {
+    serverId: value?.serverId ?? fallback.serverId,
+    serverNodeId: value?.serverNodeId ?? value?.serverId ?? fallback.serverNodeId ?? fallback.serverId,
+    userId: value?.userId ?? fallback.userId,
+    studioId: value?.studioId ?? fallback.studioId,
+    connectionKind: value?.connectionKind ?? fallback.connectionKind,
+    credentialKind: value?.credentialKind ?? fallback.credentialKind,
+    platformAccountId: value?.platformAccountId ?? fallback.platformAccountId ?? null,
+    officialServiceKind: value?.officialServiceKind ?? fallback.officialServiceKind ?? null,
+    executionBoundary: clonePlain(value?.executionBoundary ?? fallback.executionBoundary),
+    sessionId: sessionId || null,
+    sessionPath: sessionPath || null,
+    requestId: requestId || null,
+    sessionRef,
   };
 }
 
