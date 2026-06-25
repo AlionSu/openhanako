@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import '@testing-library/jest-dom/vitest';
+import { EditorView } from '@codemirror/view';
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,9 +58,26 @@ function putWorkspaceImageOnDrag(dataTransfer: DataTransfer) {
   });
 }
 
+function elementRect(width = 960, height = 640): DOMRect {
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height,
+    top: 0,
+    right: width,
+    bottom: height,
+    left: 0,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
+
 describe('PreviewEditor markdown cover drop', () => {
+  let elementRectSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     window.t = ((key: string) => key) as typeof window.t;
+    elementRectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => elementRect());
     Range.prototype.getClientRects = vi.fn(() => [] as unknown as DOMRectList);
     Range.prototype.getBoundingClientRect = vi.fn(() => ({
       x: 0,
@@ -99,6 +117,7 @@ describe('PreviewEditor markdown cover drop', () => {
   afterEach(() => {
     clearAppFileDragPayload();
     cleanup();
+    elementRectSpy.mockRestore();
   });
 
   it('replaces an existing editor cover when a workspace image is dropped on it', async () => {
@@ -165,20 +184,13 @@ describe('PreviewEditor markdown cover drop', () => {
     });
 
     render(
-      <WindowSurfaceProvider surface={{
-        id: 'detached:editor',
-        window: childWindow,
-        document: childDocument,
-        overlayRoot: childDocument.body,
-      }}>
-        <PreviewEditor
-          ref={ref}
-          content="# Detached editor"
-          filePath="/tmp/workspace/detached.md"
-          mode="markdown"
-          saveDocument={async () => ({ ok: true, conflict: false, version: null })}
-        />
-      </WindowSurfaceProvider>,
+      <PreviewEditor
+        ref={ref}
+        content="# Detached editor"
+        filePath="/tmp/workspace/detached.md"
+        mode="markdown"
+        saveDocument={async () => ({ ok: true, conflict: false, version: null })}
+      />,
       { container: childDocument.body, baseElement: childDocument.body },
     );
 
